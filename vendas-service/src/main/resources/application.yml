@@ -1,0 +1,51 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: vendas-service
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://localhost:27017/vendas_db}
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    preferIpAddress: true
+
+# Configuração do Resilience4j
+resilience4j:
+  circuitbreaker:
+    instances:
+      contratosService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+        registerHealthIndicator: true
+
+  retry:
+    instances:
+      contratosService:
+        maxAttempts: 3
+        waitDuration: 500ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+
+  ratelimiter:
+    instances:
+      vendas-api:
+        limitForPeriod: 10
+        limitRefreshPeriod: 1s
+        timeoutDuration: 0
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,circuitbreakers,retries
+  health:
+    circuitbreakers:
+      enabled: true

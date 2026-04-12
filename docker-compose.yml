@@ -1,0 +1,131 @@
+version: '3.8'
+
+services:
+
+  # ── Bancos de Dados ──────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - ms-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: mongo:7-jammy
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - ms-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Infraestrutura ───────────────────────────────────────────────────────────
+
+  eureka-server:
+    build: ./eureka-server
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    environment:
+      EUREKA_HOSTNAME: eureka-server
+    networks:
+      - ms-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8761/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      EUREKA_URL: http://eureka-server:8761/eureka/
+    networks:
+      - ms-network
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+
+  # ── Microsserviços de Negócio ────────────────────────────────────────────────
+
+  compras-service:
+    build: ./compras-service
+    container_name: compras-service
+    ports:
+      - "8081:8081"
+    environment:
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      DB_URL: jdbc:postgresql://postgres:5432/compras_db
+      DB_USER: postgres
+      DB_PASS: postgres
+    networks:
+      - ms-network
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  contratos-service:
+    build: ./contratos-service
+    container_name: contratos-service
+    ports:
+      - "8082:8082"
+    environment:
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      DB_URL: jdbc:postgresql://postgres:5432/contratos_db
+      DB_USER: postgres
+      DB_PASS: postgres
+    networks:
+      - ms-network
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  vendas-service:
+    build: ./vendas-service
+    container_name: vendas-service
+    ports:
+      - "8083:8083"
+    environment:
+      EUREKA_URL: http://eureka-server:8761/eureka/
+      MONGO_URI: mongodb://mongodb:27017/vendas_db
+    networks:
+      - ms-network
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+
+networks:
+  ms-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mongo_data:
