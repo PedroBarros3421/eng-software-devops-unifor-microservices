@@ -1,6 +1,7 @@
 package com.empresa.contratos.controller;
 
 import com.empresa.contratos.domain.Contrato;
+import com.empresa.contratos.dto.ContratoStatusDTO;
 import com.empresa.contratos.service.ContratosService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -56,5 +57,10 @@ public class ContratosController {
     public ResponseEntity<Void> excluir(@PathVariable Long id) {
         contratosService.excluir(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/validacao")
+    public ResponseEntity<ContratoStatusDTO> validarContrato(@PathVariable Long id){
+        return ResponseEntity.ok(contratosService.validarContrato(id));
     }
 }
