@@ -77,7 +77,7 @@ public class ComprasService {
     public PedidoCompra criarPedido(PedidoCompra pedido) {
         Insumo insumo = buscarInsumoPorId(pedido.getInsumoId());
 
-        if (pedido.getQuantidade() < 0) {
+        if (pedido.getQuantidade() <= 0) {
             throw new RuntimeException("A quantidade deve ser maior que 0");
         }
 
