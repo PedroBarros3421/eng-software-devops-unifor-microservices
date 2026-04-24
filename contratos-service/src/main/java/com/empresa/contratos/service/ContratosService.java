@@ -58,7 +58,7 @@ public class ContratosService {
         Contrato contrato = contratoRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Contrato não encontrado: " + id));
 
-        if (contrato.getStatus().equals(Contrato.StatusContrato.ATIVO)
+        if (Contrato.StatusContrato.ATIVO.equals(contrato.getStatus()) 
                 && contrato.getDataFim().isBefore(hoje)) {
             atualizarStatus(id, Contrato.StatusContrato.ENCERRADO);
 
@@ -66,7 +66,7 @@ public class ContratosService {
                     "A vigência do contrato terminou em " + contrato.getDataFim());
         }
 
-        if (!contrato.getStatus().equals(Contrato.StatusContrato.ATIVO)) {
+        if (!Contrato.StatusContrato.ATIVO.equals(contrato.getStatus())) {
             return new ContratoStatusDTO(id, false, contrato.getStatus().name(), "Contrato não está ativo");
         }
 
