@@ -119,13 +119,15 @@ services:
       - "8083:8083"
     environment:
       EUREKA_URL: http://eureka-server:8761/eureka/
-      MONGO_URI: mongodb://mongodb:27017/vendas_db
+      DB_URL: jdbc:postgresql://postgres:5432/vendas_db
+      DB_USER: postgres
+      DB_PASS: postgres
     networks:
       - ms-network
     depends_on:
       eureka-server:
         condition: service_healthy
-      mongodb:
+      postgres:
         condition: service_healthy
 
 networks:
