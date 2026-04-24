@@ -1,7 +1,9 @@
 package com.empresa.vendas.controller;
 
 import com.empresa.vendas.client.dto.ContratoDTO;
-import com.empresa.vendas.domain.PedidoVenda;
+import com.empresa.vendas.dtos.input.PedidoInputDTO;
+import com.empresa.vendas.dtos.output.PedidoOutputDTO;
+import com.empresa.vendas.enums.StatusPedidoVenda;
 import com.empresa.vendas.service.VendasService;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import lombok.RequiredArgsConstructor;
@@ -10,38 +12,36 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/vendas")
 @RequiredArgsConstructor
-public class VendasController {
+public class VendasController implements SwaggerVendasController {
 
     private final VendasService vendasService;
 
+    @PostMapping("/pedidos")
+    @RateLimiter(name = "vendas-api")
+    public ResponseEntity<PedidoOutputDTO> criarPedido(@RequestBody PedidoInputDTO pedidoInputDTO) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(vendasService.criarPedido(pedidoInputDTO));
+    }
+
     @GetMapping("/pedidos")
-    public List<PedidoVenda> listarPedidos() {
+    public List<PedidoOutputDTO> listarPedidos() {
         return vendasService.listarTodos();
     }
 
     @GetMapping("/pedidos/{id}")
-    public ResponseEntity<PedidoVenda> buscarPedido(@PathVariable String id) {
+    public ResponseEntity<PedidoOutputDTO> buscarPedido(@PathVariable UUID id) {
         return ResponseEntity.ok(vendasService.buscarPorId(id));
     }
 
-    /**
-     * Criação de pedido com Rate Limiter para proteger o endpoint de sobrecarga.
-     * Configurado para aceitar até 10 requisições por segundo (ver application.yml).
-     */
-    @PostMapping("/pedidos")
-    @RateLimiter(name = "vendas-api")
-    public ResponseEntity<PedidoVenda> criarPedido(@RequestBody PedidoVenda pedido) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(vendasService.criarPedido(pedido));
-    }
 
     @PatchMapping("/pedidos/{id}/status")
-    public ResponseEntity<PedidoVenda> atualizarStatus(
-            @PathVariable String id,
-            @RequestParam PedidoVenda.StatusPedidoVenda status) {
+    public ResponseEntity<PedidoOutputDTO> atualizarStatus(
+            @PathVariable UUID id,
+            @RequestParam StatusPedidoVenda status) {
         return ResponseEntity.ok(vendasService.atualizarStatus(id, status));
     }
 
