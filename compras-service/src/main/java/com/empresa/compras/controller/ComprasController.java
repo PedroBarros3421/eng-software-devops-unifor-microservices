@@ -1,7 +1,10 @@
 package com.empresa.compras.controller;
 
+import com.empresa.compras.controller.dto.InsumoPatchDTO;
+import com.empresa.compras.controller.dto.PedidoPatchInput;
 import com.empresa.compras.domain.Insumo;
 import com.empresa.compras.domain.PedidoCompra;
+import com.empresa.compras.domain.enuns.StatusPedido;
 import com.empresa.compras.service.ComprasService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -34,10 +37,9 @@ public class ComprasController {
         return ResponseEntity.status(HttpStatus.CREATED).body(comprasService.salvarInsumo(insumo));
     }
 
-    @PutMapping("/insumos/{id}")
-    public ResponseEntity<Insumo> atualizarInsumo(@PathVariable Long id, @RequestBody Insumo insumo) {
-        insumo.setId(id);
-        return ResponseEntity.ok(comprasService.salvarInsumo(insumo));
+    @PatchMapping("/insumos/{id}")
+    public ResponseEntity<Insumo> atualizarInsumo(@PathVariable Long id, @RequestBody InsumoPatchDTO patch) {
+        return ResponseEntity.ok(comprasService.atualizarInsumoParcial(id, patch));
     }
 
     @DeleteMapping("/insumos/{id}")
@@ -63,10 +65,15 @@ public class ComprasController {
         return ResponseEntity.status(HttpStatus.CREATED).body(comprasService.criarPedido(pedido));
     }
 
+    @PatchMapping("/pedidos/{id}")
+    public ResponseEntity<PedidoCompra> atualizarPedido(@PathVariable Long id, @RequestBody PedidoPatchInput patch) {
+        return ResponseEntity.ok(comprasService.atualizarPedido(id, patch));
+    }
+
     @PatchMapping("/pedidos/{id}/status")
     public ResponseEntity<PedidoCompra> atualizarStatus(
             @PathVariable Long id,
-            @RequestParam PedidoCompra.StatusPedido status) {
+            @RequestParam StatusPedido status) {
         return ResponseEntity.ok(comprasService.atualizarStatus(id, status));
     }
 }
