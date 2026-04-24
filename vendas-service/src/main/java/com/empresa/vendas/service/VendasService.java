@@ -2,8 +2,11 @@ package com.empresa.vendas.service;
 
 import com.empresa.vendas.client.ContratosClient;
 import com.empresa.vendas.client.dto.ContratoDTO;
-import com.empresa.vendas.domain.PedidoVenda;
-import com.empresa.vendas.repository.PedidoVendaRepository;
+import com.empresa.vendas.domain.Pedido;
+import com.empresa.vendas.dtos.input.PedidoInputDTO;
+import com.empresa.vendas.dtos.output.PedidoOutputDTO;
+import com.empresa.vendas.enums.StatusPedidoVenda;
+import com.empresa.vendas.repository.PedidoRepository;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
@@ -14,39 +17,88 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class VendasService {
 
-    private final PedidoVendaRepository pedidoVendaRepository;
+    private final PedidoRepository pedidoRepository;
     private final ContratosClient contratosClient;
 
-    public List<PedidoVenda> listarTodos() {
-        return pedidoVendaRepository.findAll();
+    public List<PedidoOutputDTO> listarTodos() {
+        List<Pedido> list = pedidoRepository.findAll();
+        return list.stream().map(pedido -> new PedidoOutputDTO(
+                pedido.getId(),
+                pedido.getNomeCliente(),
+                pedido.getValorTotal(),
+                pedido.getDataPedido(),
+                pedido.getContratoId(),
+                null, // Mapear itens se necessário
+                pedido.getDataCriacao(),
+                pedido.getDataAtualizacao()
+        )).toList();
     }
 
-    public PedidoVenda buscarPorId(String id) {
-        return pedidoVendaRepository.findById(id)
+    public PedidoOutputDTO buscarPorId(UUID id) {
+        var pedido = findById(id);
+        return new PedidoOutputDTO(
+                pedido.getId(),
+                pedido.getNomeCliente(),
+                pedido.getValorTotal(),
+                pedido.getDataPedido(),
+                pedido.getContratoId(),
+                null, // Mapear itens se necessário
+                pedido.getDataCriacao(),
+                pedido.getDataAtualizacao()
+        );
+    }
+
+    public Pedido findById(UUID id) {
+        return pedidoRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Pedido de venda não encontrado: " + id));
     }
 
-    public PedidoVenda criarPedido(PedidoVenda pedido) {
-        BigDecimal total = pedido.getItens().stream()
-                .map(item -> item.getPrecoUnitario().multiply(BigDecimal.valueOf(item.getQuantidade())))
+    public PedidoOutputDTO criarPedido(PedidoInputDTO pedidoInputDTO) {
+        BigDecimal total = pedidoInputDTO.itens().stream()
+                .map(item -> item.precoUnitario().multiply(BigDecimal.valueOf(item.quantidade())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        Pedido pedido = new Pedido();
         pedido.setValorTotal(total);
-        pedido.setStatus(PedidoVenda.StatusPedidoVenda.PENDENTE);
+        pedido.setStatus(StatusPedidoVenda.PENDENTE);
         pedido.setDataPedido(LocalDate.now());
-        return pedidoVendaRepository.save(pedido);
+        pedido = pedidoRepository.save(pedido);
+
+        return new PedidoOutputDTO(
+                pedido.getId(),
+                pedido.getNomeCliente(),
+                pedido.getValorTotal(),
+                pedido.getDataPedido(),
+                pedido.getContratoId(),
+                null, // Mapear itens se necessário
+                pedido.getDataCriacao(),
+                pedido.getDataAtualizacao()
+        );
     }
 
-    public PedidoVenda atualizarStatus(String id, PedidoVenda.StatusPedidoVenda novoStatus) {
-        PedidoVenda pedido = buscarPorId(id);
+    public PedidoOutputDTO atualizarStatus(UUID id, StatusPedidoVenda novoStatus) {
+        Pedido pedido = findById(id);
         pedido.setStatus(novoStatus);
-        return pedidoVendaRepository.save(pedido);
+        pedido = pedidoRepository.save(pedido);
+
+        return new PedidoOutputDTO(
+                pedido.getId(),
+                pedido.getNomeCliente(),
+                pedido.getValorTotal(),
+                pedido.getDataPedido(),
+                pedido.getContratoId(),
+                null, // Mapear itens se necessário
+                pedido.getDataCriacao(),
+                pedido.getDataAtualizacao()
+        );
+
     }
 
     /**
