@@ -1,13 +1,13 @@
 server:
-  port: 8081
+  port: 8082
 
 spring:
   application:
-    name: compras-service
+    name: contratos-service
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/compras_db}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/contratos_db}
     username: ${DB_USER:postgres}
-    password: ${DB_PASS:mypostgres123}
+    password: ${DB_PASS:postgres}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -25,7 +25,10 @@ eureka:
     preferIpAddress: true
 
 management:
+  endpoint:
+    health:
+      show-details: always
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: "health,info"

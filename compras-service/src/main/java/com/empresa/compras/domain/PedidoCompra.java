@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+import com.empresa.compras.domain.enuns.StatusPedido;
+
 @Entity
 @Table(name = "pedidos_compra")
 @Data
@@ -36,7 +38,4 @@ public class PedidoCompra {
     @Column(name = "data_pedido", nullable = false)
     private LocalDate dataPedido;
 
-    public enum StatusPedido {
-        PENDENTE, APROVADO, ENTREGUE, CANCELADO
-    }
 }
