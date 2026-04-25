@@ -27,4 +27,3 @@ CREATE TABLE IF NOT EXISTS itens (
 );
 
 CREATE INDEX IF NOT EXISTS idx_itens_pedido_id ON itens (pedido_id);
-

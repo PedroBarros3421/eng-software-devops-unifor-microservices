@@ -1,10 +1,13 @@
 package com.empresa.compras.controller;
 
 import com.empresa.compras.controller.dto.InsumoPatchDTO;
+import com.empresa.compras.controller.dto.BaixaEstoqueInputDTO;
+import com.empresa.compras.controller.dto.BaixaEstoqueResponseDTO;
+import com.empresa.compras.controller.dto.DisponibilidadeInsumoDTO;
 import com.empresa.compras.controller.dto.PedidoPatchInput;
 import com.empresa.compras.domain.Insumo;
 import com.empresa.compras.domain.PedidoCompra;
-import com.empresa.compras.domain.enuns.StatusPedido;
+import com.empresa.compras.domain.enums.StatusPedido;
 import com.empresa.compras.service.ComprasService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -40,6 +43,20 @@ public class ComprasController {
     @PatchMapping("/insumos/{id}")
     public ResponseEntity<Insumo> atualizarInsumo(@PathVariable Long id, @RequestBody InsumoPatchDTO patch) {
         return ResponseEntity.ok(comprasService.atualizarInsumoParcial(id, patch));
+    }
+
+    @GetMapping("/insumos/{id}/disponibilidade")
+    public ResponseEntity<DisponibilidadeInsumoDTO> consultarDisponibilidade(
+            @PathVariable Long id,
+            @RequestParam Integer quantidade) {
+        return ResponseEntity.ok(comprasService.consultarDisponibilidade(id, quantidade));
+    }
+
+    @PostMapping("/insumos/{id}/baixa")
+    public ResponseEntity<BaixaEstoqueResponseDTO> baixarEstoque(
+            @PathVariable Long id,
+            @RequestBody BaixaEstoqueInputDTO input) {
+        return ResponseEntity.ok(comprasService.baixarEstoque(id, input));
     }
 
     @DeleteMapping("/insumos/{id}")
