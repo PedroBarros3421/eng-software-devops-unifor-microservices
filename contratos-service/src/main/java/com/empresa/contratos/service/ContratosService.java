@@ -55,6 +55,15 @@ public class ContratosService {
         LocalDate hoje = LocalDate.now();
         Contrato contrato = buscarPorId(id);
 
+        if (contrato.getDataInicio().isAfter(hoje)) {
+            return new ContratoStatusDTO(
+                    id,
+                    false,
+                    contrato.getStatus().name(),
+                    "Contrato ainda não iniciou. Vigência a partir de " + contrato.getDataInicio()
+            );
+        }
+
         if (Contrato.StatusContrato.ATIVO.equals(contrato.getStatus()) 
                 && contrato.getDataFim().isBefore(hoje)) {
             contrato = atualizarStatus(id, Contrato.StatusContrato.ENCERRADO);
