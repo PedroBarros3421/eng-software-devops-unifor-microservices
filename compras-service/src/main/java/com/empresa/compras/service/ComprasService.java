@@ -1,6 +1,9 @@
 package com.empresa.compras.service;
 
 import com.empresa.compras.controller.dto.InsumoPatchDTO;
+import com.empresa.compras.controller.dto.BaixaEstoqueInputDTO;
+import com.empresa.compras.controller.dto.BaixaEstoqueResponseDTO;
+import com.empresa.compras.controller.dto.DisponibilidadeInsumoDTO;
 import com.empresa.compras.controller.dto.PedidoPatchInput;
 import com.empresa.compras.domain.Insumo;
 import com.empresa.compras.domain.PedidoCompra;
@@ -64,6 +67,41 @@ public class ComprasService {
         insumoRepository.deleteById(id);
     }
 
+    public DisponibilidadeInsumoDTO consultarDisponibilidade(Long id, Integer quantidade) {
+        if (quantidade == null || quantidade <= 0) {
+            throw new RuntimeException("A quantidade deve ser maior que 0");
+        }
+
+        Insumo insumo = buscarInsumoPorId(id);
+        return new DisponibilidadeInsumoDTO(
+                id,
+                insumo.getQuantidadeEstoque() >= quantidade,
+                quantidade,
+                insumo.getQuantidadeEstoque()
+        );
+    }
+
+    @Transactional
+    public BaixaEstoqueResponseDTO baixarEstoque(Long id, BaixaEstoqueInputDTO input) {
+        if (input.getQuantidade() == null || input.getQuantidade() <= 0) {
+            throw new RuntimeException("A quantidade deve ser maior que 0");
+        }
+
+        Insumo insumo = buscarInsumoPorId(id);
+        if (insumo.getQuantidadeEstoque() < input.getQuantidade()) {
+            throw new RuntimeException("Estoque insuficiente para o insumo: " + id);
+        }
+
+        insumo.setQuantidadeEstoque(insumo.getQuantidadeEstoque() - input.getQuantidade());
+        insumoRepository.save(insumo);
+
+        return new BaixaEstoqueResponseDTO(
+                id,
+                input.getQuantidade(),
+                insumo.getQuantidadeEstoque()
+        );
+    }
+
     public List<PedidoCompra> listarPedidos() {
         return pedidoCompraRepository.findAll();
     }
@@ -75,7 +113,7 @@ public class ComprasService {
 
     @Transactional
     public PedidoCompra criarPedido(PedidoCompra pedido) {
-        Insumo insumo = buscarInsumoPorId(pedido.getInsumoId());
+        buscarInsumoPorId(pedido.getInsumoId());
 
         if (pedido.getQuantidade() <= 0) {
             throw new RuntimeException("A quantidade deve ser maior que 0");

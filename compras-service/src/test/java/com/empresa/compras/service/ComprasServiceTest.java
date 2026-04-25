@@ -1,6 +1,9 @@
 package com.empresa.compras.service;
 
 import com.empresa.compras.controller.dto.PedidoPatchInput;
+import com.empresa.compras.controller.dto.BaixaEstoqueInputDTO;
+import com.empresa.compras.controller.dto.BaixaEstoqueResponseDTO;
+import com.empresa.compras.controller.dto.DisponibilidadeInsumoDTO;
 import com.empresa.compras.domain.Insumo;
 import com.empresa.compras.domain.PedidoCompra;
 import com.empresa.compras.domain.enums.StatusPedido;
@@ -84,6 +87,49 @@ class ComprasServiceTest {
         assertEquals("Fornecedor Atualizado", atualizado.getNomeFornecedor());
         assertEquals(8, atualizado.getQuantidade());
         assertEquals(new BigDecimal("80.00"), atualizado.getPrecoTotal());
+    }
+
+    @Test
+    void deveRetornarDisponibilidadeQuandoHouverEstoqueSuficiente() {
+        Insumo insumo = novoInsumo(10);
+        when(insumoRepository.findById(100L)).thenReturn(Optional.of(insumo));
+
+        DisponibilidadeInsumoDTO response = comprasService.consultarDisponibilidade(100L, 4);
+
+        assertEquals(100L, response.insumoId());
+        assertEquals(true, response.disponivel());
+        assertEquals(4, response.quantidadeSolicitada());
+        assertEquals(10, response.quantidadeEstoque());
+    }
+
+    @Test
+    void deveBaixarEstoqueQuandoQuantidadeForValida() {
+        Insumo insumo = novoInsumo(10);
+        BaixaEstoqueInputDTO input = new BaixaEstoqueInputDTO();
+        input.setQuantidade(3);
+
+        when(insumoRepository.findById(100L)).thenReturn(Optional.of(insumo));
+        when(insumoRepository.save(any(Insumo.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        BaixaEstoqueResponseDTO response = comprasService.baixarEstoque(100L, input);
+
+        assertEquals(100L, response.insumoId());
+        assertEquals(3, response.quantidadeBaixada());
+        assertEquals(7, response.quantidadeEstoqueAtual());
+    }
+
+    @Test
+    void deveFalharQuandoBaixaDeEstoqueNaoTiverQuantidadeSuficiente() {
+        Insumo insumo = novoInsumo(2);
+        BaixaEstoqueInputDTO input = new BaixaEstoqueInputDTO();
+        input.setQuantidade(3);
+
+        when(insumoRepository.findById(100L)).thenReturn(Optional.of(insumo));
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> comprasService.baixarEstoque(100L, input));
+
+        assertEquals("Estoque insuficiente para o insumo: 100", ex.getMessage());
     }
 
     private PedidoCompra novoPedido(StatusPedido status, int quantidade) {

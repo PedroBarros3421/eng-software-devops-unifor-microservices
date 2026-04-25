@@ -1,8 +1,11 @@
 package com.empresa.vendas.service;
 
 import com.empresa.vendas.client.ContratosClient;
+import com.empresa.vendas.client.ComprasClient;
+import com.empresa.vendas.client.dto.BaixaEstoqueInputDTO;
 import com.empresa.vendas.client.dto.ContratoDTO;
 import com.empresa.vendas.client.dto.ContratoStatusResponseDTO;
+import com.empresa.vendas.client.dto.DisponibilidadeInsumoDTO;
 import com.empresa.vendas.domain.Item;
 import com.empresa.vendas.domain.Pedido;
 import com.empresa.vendas.dtos.input.ItemInputDTO;
@@ -35,6 +38,7 @@ public class VendasService {
 
     private final PedidoRepository pedidoRepository;
     private final ContratosClient contratosClient;
+    private final ComprasClient comprasClient;
 
     @Transactional(readOnly = true)
     public List<PedidoOutputDTO> listarTodos() {
@@ -66,6 +70,20 @@ public class VendasService {
         List<ItemInputDTO> itensInput = nonNull(pedidoInputDTO.itens()) ? pedidoInputDTO.itens() : Collections.emptyList();
         if (itensInput.isEmpty()) {
             throw new RuntimeException("O pedido deve possuir ao menos um item");
+        }
+
+        for (ItemInputDTO item : itensInput) {
+            DisponibilidadeInsumoDTO disponibilidade = comprasClient.consultarDisponibilidade(item.insumoId(), item.quantidade());
+            if (isNull(disponibilidade)) {
+                throw new RuntimeException("Não foi possível validar o estoque do insumo: " + item.insumoId());
+            }
+            if (!disponibilidade.disponivel()) {
+                throw new RuntimeException("Estoque insuficiente para o insumo: " + item.insumoId());
+            }
+        }
+
+        for (ItemInputDTO item : itensInput) {
+            comprasClient.baixarEstoque(item.insumoId(), new BaixaEstoqueInputDTO(item.quantidade()));
         }
 
         BigDecimal total = itensInput.stream()
