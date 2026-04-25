@@ -4,7 +4,7 @@ import com.empresa.compras.controller.dto.InsumoPatchDTO;
 import com.empresa.compras.controller.dto.PedidoPatchInput;
 import com.empresa.compras.domain.Insumo;
 import com.empresa.compras.domain.PedidoCompra;
-import com.empresa.compras.domain.enuns.StatusPedido;
+import com.empresa.compras.domain.enums.StatusPedido;
 import com.empresa.compras.repository.InsumoRepository;
 import com.empresa.compras.repository.PedidoCompraRepository;
 import lombok.RequiredArgsConstructor;

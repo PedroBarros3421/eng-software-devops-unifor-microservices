@@ -4,7 +4,7 @@ import com.empresa.compras.controller.dto.InsumoPatchDTO;
 import com.empresa.compras.controller.dto.PedidoPatchInput;
 import com.empresa.compras.domain.Insumo;
 import com.empresa.compras.domain.PedidoCompra;
-import com.empresa.compras.domain.enuns.StatusPedido;
+import com.empresa.compras.domain.enums.StatusPedido;
 import com.empresa.compras.service.ComprasService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

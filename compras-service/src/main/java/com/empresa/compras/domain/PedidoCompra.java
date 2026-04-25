@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-import com.empresa.compras.domain.enuns.StatusPedido;
+import com.empresa.compras.domain.enums.StatusPedido;
 
 @Entity
 @Table(name = "pedidos_compra")

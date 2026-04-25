@@ -1,7 +1,7 @@
 package com.empresa.compras.repository;
 
 import com.empresa.compras.domain.PedidoCompra;
-import com.empresa.compras.domain.enuns.StatusPedido;
+import com.empresa.compras.domain.enums.StatusPedido;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
