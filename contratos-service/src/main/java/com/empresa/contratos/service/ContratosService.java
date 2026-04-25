@@ -52,15 +52,12 @@ public class ContratosService {
     }
 
     public ContratoStatusDTO validarContrato(Long id) {
-
         LocalDate hoje = LocalDate.now();
-
-        Contrato contrato = contratoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Contrato não encontrado: " + id));
+        Contrato contrato = buscarPorId(id);
 
         if (Contrato.StatusContrato.ATIVO.equals(contrato.getStatus()) 
                 && contrato.getDataFim().isBefore(hoje)) {
-            atualizarStatus(id, Contrato.StatusContrato.ENCERRADO);
+            contrato = atualizarStatus(id, Contrato.StatusContrato.ENCERRADO);
 
             return new ContratoStatusDTO(id, false, contrato.getStatus().name(),
                     "A vigência do contrato terminou em " + contrato.getDataFim());
