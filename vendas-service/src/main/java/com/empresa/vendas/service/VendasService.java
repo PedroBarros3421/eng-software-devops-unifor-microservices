@@ -13,6 +13,8 @@ import com.empresa.vendas.dtos.input.PedidoInputDTO;
 import com.empresa.vendas.dtos.output.ItemOutputDTO;
 import com.empresa.vendas.dtos.output.PedidoOutputDTO;
 import com.empresa.vendas.enums.StatusPedidoVenda;
+import com.empresa.vendas.exception.BusinessException;
+import com.empresa.vendas.exception.ResourceNotFoundException;
 import com.empresa.vendas.repository.PedidoRepository;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
@@ -55,30 +57,30 @@ public class VendasService {
     @Transactional(readOnly = true)
     public Pedido findById(UUID id) {
         return pedidoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Pedido de venda não encontrado: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Pedido de venda não encontrado: " + id));
     }
 
     @Transactional
     public PedidoOutputDTO criarPedido(PedidoInputDTO pedidoInputDTO) {
         ContratoStatusResponseDTO contratoStatusResponseDTO = contratosClient.validarContrato(pedidoInputDTO.contratoId());
         if (nonNull(contratoStatusResponseDTO) && !contratoStatusResponseDTO.valido())
-            throw new RuntimeException("Contrato inválido ou inativo: " + pedidoInputDTO.contratoId());
+            throw new BusinessException("Contrato inválido ou inativo: " + pedidoInputDTO.contratoId());
 
         if (isNull(contratoStatusResponseDTO))
-            throw new RuntimeException("Não foi possível validar o contrato: " + pedidoInputDTO.contratoId());
+            throw new BusinessException("Não foi possível validar o contrato: " + pedidoInputDTO.contratoId());
 
         List<ItemInputDTO> itensInput = nonNull(pedidoInputDTO.itens()) ? pedidoInputDTO.itens() : Collections.emptyList();
         if (itensInput.isEmpty()) {
-            throw new RuntimeException("O pedido deve possuir ao menos um item");
+            throw new BusinessException("O pedido deve possuir ao menos um item");
         }
 
         for (ItemInputDTO item : itensInput) {
             DisponibilidadeInsumoDTO disponibilidade = comprasClient.consultarDisponibilidade(item.insumoId(), item.quantidade());
             if (isNull(disponibilidade)) {
-                throw new RuntimeException("Não foi possível validar o estoque do insumo: " + item.insumoId());
+                throw new BusinessException("Não foi possível validar o estoque do insumo: " + item.insumoId());
             }
             if (!disponibilidade.disponivel()) {
-                throw new RuntimeException("Estoque insuficiente para o insumo: " + item.insumoId());
+                throw new BusinessException("Estoque insuficiente para o insumo: " + item.insumoId());
             }
         }
 

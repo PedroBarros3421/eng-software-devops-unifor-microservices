@@ -2,6 +2,7 @@ package com.empresa.contratos.service;
 
 import com.empresa.contratos.domain.Contrato;
 import com.empresa.contratos.dto.ContratoStatusDTO;
+import com.empresa.contratos.exception.ResourceNotFoundException;
 import com.empresa.contratos.repository.ContratoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,12 +27,12 @@ public class ContratosService {
 
     public Contrato buscarPorId(Long id) {
         return contratoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Contrato não encontrado: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Contrato não encontrado: " + id));
     }
 
     public Contrato buscarPorNumero(String numero) {
         return contratoRepository.findByNumero(numero)
-                .orElseThrow(() -> new RuntimeException("Contrato não encontrado: " + numero));
+                .orElseThrow(() -> new ResourceNotFoundException("Contrato não encontrado: " + numero));
     }
 
     @Transactional
