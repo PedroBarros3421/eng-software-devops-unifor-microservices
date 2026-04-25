@@ -32,6 +32,62 @@ services:
     networks:
       - ms-network
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--web.enable-lifecycle"
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - ms-network
+
+  loki:
+    image: grafana/loki:2.9.8
+    container_name: loki
+    command: [ "-config.file=/etc/loki/local-config.yaml" ]
+    ports:
+      - "${LOKI_PORT:-3100}:3100"
+    volumes:
+      - ./observability/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+    networks:
+      - ms-network
+
+  promtail:
+    image: grafana/promtail:2.9.8
+    container_name: promtail
+    command: [ "-config.file=/etc/promtail/config.yml" ]
+    volumes:
+      - ./observability/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      - loki
+    networks:
+      - ms-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+      - loki
+      - jaeger
+    networks:
+      - ms-network
+
   eureka-server:
     build: ./eureka-server
     container_name: eureka-server
@@ -39,6 +95,7 @@ services:
       - "${EUREKA_PORT:-8761}:8761"
     environment:
       EUREKA_HOSTNAME: ${EUREKA_HOSTNAME:-eureka-server}
+      JAEGER_URL: ${JAEGER_URL:-http://jaeger:4318/v1/traces}
     networks:
       - ms-network
     healthcheck:
@@ -54,6 +111,7 @@ services:
       - "${API_GATEWAY_PORT:-8080}:8080"
     environment:
       EUREKA_URL: ${EUREKA_URL:-http://eureka-server:8761/eureka/}
+      JAEGER_URL: ${JAEGER_URL:-http://jaeger:4318/v1/traces}
     networks:
       - ms-network
     depends_on:
@@ -131,4 +189,3 @@ networks:
 
 volumes:
   postgres_data:
-  mongo_data:

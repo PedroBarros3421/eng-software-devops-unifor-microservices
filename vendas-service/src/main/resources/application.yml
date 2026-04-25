@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: vendas-service
+  cloud:
+    openfeign:
+      micrometer:
+        enabled: true
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/vendas_db}
     username: ${DB_USER:postgres}
@@ -27,6 +31,11 @@ eureka:
       defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
   instance:
     preferIpAddress: true
+
+logging:
+  include-application-name: false
+  pattern:
+    correlation: "[${spring.application.name:vendas-service},%X{traceId:-},%X{spanId:-}] "
 
 # Configuração do Resilience4j
 resilience4j:
@@ -58,13 +67,13 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,circuitbreakers,retries
+        include: health,info,circuitbreakers,retries,prometheus
   health:
     circuitbreakers:
       enabled: true
   tracing:
     sampling:
-      probability: 1.0  # Send 100% of traces (adjust for production)
+      probability: 1.0
   otlp:
     tracing:
-      endpoint: ${JAEGER_URL:http://localhost:4318/v1/traces} # Jaeger OTLP HTTP receiver
+      endpoint: ${JAEGER_URL:http://localhost:4318/v1/traces}
