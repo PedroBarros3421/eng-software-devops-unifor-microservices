@@ -355,7 +355,6 @@ Arquivos gerados:
 | ADR-003 | [doc/adr-003-observabilidade.md](doc/adr-003-observabilidade.md) |
 | Resultado de performance | [doc/performance.md](doc/performance.md) |
 | Checklist de Peer Review | [doc/peer-review-checklist.md](doc/peer-review-checklist.md) |
-| Fluxo da apresentação | [doc/fluxo-apresentacao.md](doc/fluxo-apresentacao.md) |
 
 ## 15. Critérios de avaliação atendidos
 
