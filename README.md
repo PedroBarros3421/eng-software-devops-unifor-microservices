@@ -1,52 +1,238 @@
-# Sistema de Gestão Comercial — Microsserviços
+# Sistema de Gestão Comercial com Microsserviços
 
-Projeto integrador da disciplina **Arquitetura de Microsserviços e Escalabilidade**
+Projeto integrador da disciplina **Arquitetura de Microsserviços e Escalabilidade**.
 
----
+## 1. Visão geral
 
-## Subindo o ambiente
+O sistema implementa um fluxo comercial distribuído com três capacidades de negócio:
+
+- **Contratos**: vigência, status e elegibilidade comercial;
+- **Compras/Estoque**: cadastro de insumos, disponibilidade e baixa de estoque;
+- **Vendas**: criação do pedido e orquestração do fluxo de negócio.
+
+O objetivo da solução é demonstrar:
+
+- decomposição por **Bounded Contexts**, e não por camada técnica;
+- **deploy independente** de serviços;
+- **Database per Service**;
+- comunicação síncrona via HTTP entre serviços;
+- **observabilidade** com métricas, logs e traces;
+- medição de performance com **p50, p95, p99 e throughput**;
+- critérios formais de **SLI, SLO e SLA**.
+
+## 2. Por que usar microsserviços neste caso
+
+Microsserviços fazem sentido aqui porque o domínio tem responsabilidades diferentes e acoplamento de negócio explícito:
+
+- **Contratos** responde se uma venda é comercialmente válida;
+- **Compras** responde se há estoque suficiente para a operação;
+- **Vendas** coordena essas decisões e persiste o pedido.
+
+Se tudo estivesse em um único processo:
+
+- qualquer mudança em venda, contrato ou estoque exigiria redeploy do sistema inteiro;
+- a escalabilidade seria forçada para todos os módulos ao mesmo tempo;
+- a observabilidade de falhas entre domínios ficaria diluída;
+- a evolução do modelo de dados ficaria mais acoplada.
+
+Aqui, a decomposição foi feita por **capacidade de negócio**, alinhada ao material da disciplina e ao princípio de evitar “decomposição por função técnica”.
+
+## 3. Bounded Contexts
+
+| Bounded Context | Responsabilidade | Serviço |
+|---|---|---|
+| Contratos | vigência, status e validação comercial do contrato | `contratos-service` |
+| Compras | insumos, estoque disponível, baixa de estoque e pedidos de compra | `compras-service` |
+| Vendas | criação do pedido e orquestração entre contrato e estoque | `vendas-service` |
+
+## 4. Arquitetura da solução
+
+```text
+Cliente
+  |
+  v
+API Gateway (:8080)
+  |
+  +--> contratos-service (:8082)
+  |
+  +--> compras-service (:8081)
+  |
+  +--> vendas-service (:8083)
+          |
+          +--> contratos-service
+          |
+          +--> compras-service
+
+Eureka Server (:8761)
+Prometheus (:9090)
+Grafana (:3000)
+Jaeger (:16686)
+Loki + Promtail
+PostgreSQL (:5432)
+```
+
+### Padrões usados
+
+- **API Gateway** para ponto único de entrada;
+- **Service Discovery** com Eureka;
+- **OpenFeign** para comunicação síncrona entre serviços;
+- **Circuit Breaker** e **Retry** no fluxo de vendas;
+- **Correlation ID** para rastreabilidade distribuída;
+- **Docker Compose** para execução local do ambiente completo.
+
+## 5. Fluxo principal da apresentação
+
+Fluxo principal: **criação de pedido de venda**.
+
+1. o cliente envia `POST /api/vendas/pedidos` pelo gateway;
+2. `vendas-service` valida o contrato no `contratos-service`;
+3. `vendas-service` valida disponibilidade no `compras-service`;
+4. `vendas-service` baixa o estoque no `compras-service`;
+5. `vendas-service` persiste o pedido e retorna `201 Created`.
+
+Esse fluxo permite demonstrar:
+
+- comunicação entre microsserviços;
+- dependência entre contextos delimitados;
+- falha comercial por contrato inválido;
+- falha operacional por estoque insuficiente;
+- rastreamento de ponta a ponta com logs e traces.
+
+## 6. SLI, SLO e SLA
+
+### Conceitos
+
+- **Métrica**: valor observável, como throughput ou tempo de resposta.
+- **SLI**: métrica formalizada com fórmula, unidade, escopo e janela.
+- **SLO**: meta definida para um SLI.
+- **SLA**: compromisso global assumido com base em um conjunto de SLOs.
+
+### Como foi aplicado neste projeto
+
+- **SLIs e SLOs por microsserviço**:
+  - `contratos-service`
+  - `compras-service`
+  - `vendas-service`
+- **SLIs e SLOs do fluxo principal**:
+  - `POST /api/vendas/pedidos`
+- **SLIs globais e SLA da aplicação**:
+  - disponibilidade global
+  - latência P95 global
+  - latência P99 global
+
+### Resultado consolidado
+
+Execução validada:
+
+```bash
+DURATION_SECONDS=30 WORKERS=8 make perf
+```
+
+Resumo global:
+
+- disponibilidade global: **100,00%**
+- P95 global: **61,97 ms**
+- P99 global: **83,16 ms**
+- throughput global: **244,50 req/s**
+
+Resultado do fluxo principal:
+
+- disponibilidade: **100,00%**
+- sucesso de negócio: **100,00%**
+- P95: **70,21 ms**
+- P99: **89,15 ms**
+
+Detalhamento completo em [doc/performance.md](doc/performance.md).
+
+## 7. Observabilidade
+
+O projeto implementa os três pilares da observabilidade:
+
+| Pilar | Ferramenta | URL |
+|---|---|---|
+| Métricas | Prometheus + Grafana | http://localhost:9090 / http://localhost:3000 |
+| Logs | Loki + Promtail + Grafana | http://localhost:3000 |
+| Traces | Jaeger | http://localhost:16686 |
+
+### Correlation ID
+
+Cada requisição recebe ou reaproveita `X-Correlation-ID`.
+
+Esse valor:
+
+- é gerado ou preservado pelo gateway;
+- é propagado entre os serviços;
+- aparece nos logs junto de `traceId` e `spanId`;
+- retorna ao cliente na resposta.
+
+Isso atende ao critério da disciplina para **logging estruturado com Correlation ID**.
+
+## 8. Health check
+
+Todos os serviços expõem `/health`.
+
+Exemplos:
+
+```bash
+curl http://localhost:8080/health
+curl http://localhost:8081/health
+curl http://localhost:8082/health
+curl http://localhost:8083/health
+curl http://localhost:8761/health
+```
+
+O `docker-compose.yml` usa esses endpoints para health check operacional dos containers.
+
+## 9. Segurança
+
+O foco da entrega não é autenticação completa, mas a arquitetura já considera:
+
+- ponto único de entrada no `api-gateway`;
+- isolamento por serviço e por banco;
+- configuração por variáveis de ambiente;
+- validação de entrada e tratamento consistente de erro;
+- estrutura preparada para evolução futura com JWT/mTLS.
+
+## 10. Subindo o ambiente
 
 ```bash
 docker compose up --build -d
 ```
 
-Aguardar todos os containers ficarem `healthy` (~60–90s). Verificar:
+Verificar o estado:
 
 ```bash
-docker ps
+docker compose ps
 ```
 
-Todos devem exibir `(healthy)` ou estar em execução estável.
-
----
-
-## Serviços e portas
+Serviços principais:
 
 | Serviço | Porta | URL |
 |---|---|---|
 | API Gateway | 8080 | http://localhost:8080 |
 | Eureka Server | 8761 | http://localhost:8761 |
-| compras-service | 8081 | interno (via gateway) |
-| contratos-service | 8082 | interno (via gateway) |
-| vendas-service | 8083 | interno (via gateway) |
+| compras-service | 8081 | interno e debug local |
+| contratos-service | 8082 | interno e debug local |
+| vendas-service | 8083 | interno e debug local |
 | Grafana | 3000 | http://localhost:3000 |
-| Jaeger | 16686 | http://localhost:16686 |
 | Prometheus | 9090 | http://localhost:9090 |
+| Jaeger | 16686 | http://localhost:16686 |
 
-> Todo tráfego externo passa pelo gateway na porta **8080**.
+## 11. Demonstração ao vivo
 
----
+Use um identificador único para tornar os comandos reexecutáveis:
 
-## Demonstração ao vivo
+```bash
+RUN_ID=$(date +%s)
+```
 
-### Pré-requisitos dos cenários
+### 11.1 Criar contrato
 
-**Criar um contrato:**
 ```bash
 CONTRATO_ID=$(curl -s -X POST http://localhost:8080/api/contratos \
   -H "Content-Type: application/json" \
   -d '{
-    "numero": "CTR-DEMO-README",
+    "numero": "CTR-DEMO-'"$RUN_ID"'",
     "nomeContratante": "Cliente Demo",
     "valorTotal": 1000.00,
     "dataInicio": "2026-01-01",
@@ -54,36 +240,23 @@ CONTRATO_ID=$(curl -s -X POST http://localhost:8080/api/contratos \
     "status": "ATIVO",
     "termos": "Contrato para demonstracao"
   }' | jq -r '.id')
-
-echo "$CONTRATO_ID"
 ```
 
-Payload inválido deve retornar `400 Bad Request`.
+### 11.2 Criar insumo
 
-**Criar um insumo com estoque:**
 ```bash
 INSUMO_ID=$(curl -s -X POST http://localhost:8080/api/compras/insumos \
   -H "Content-Type: application/json" \
   -d '{
-    "nome": "Insumo Demo",
+    "nome": "Insumo Demo '"$RUN_ID"'",
     "descricao": "Material de demonstracao",
     "unidadeMedida": "UN",
     "precoUnitario": 10.00,
     "quantidadeEstoque": 100
   }' | jq -r '.id')
-
-echo "$INSUMO_ID"
 ```
 
-Payload inválido deve retornar `400 Bad Request`.
-
-> Os comandos acima armazenam os `id` em `CONTRATO_ID` e `INSUMO_ID`.
-
----
-
-### Cenário 1 — Sucesso
-
-Criar uma venda com contrato ativo e estoque disponível:
+### 11.3 Cenário de sucesso
 
 ```bash
 curl -s -X POST http://localhost:8080/api/vendas/pedidos \
@@ -93,40 +266,20 @@ curl -s -X POST http://localhost:8080/api/vendas/pedidos \
     "contratoId": '"$CONTRATO_ID"',
     "itens": [{
       "insumoId": '"$INSUMO_ID"',
-      "nomeInsumo": "Insumo Demo",
+      "nomeInsumo": "Insumo Demo '"$RUN_ID"'",
       "quantidade": 2,
       "precoUnitario": 10.00
     }]
   }' | jq .
 ```
 
-**Resultado esperado:** `201 Created` com o pedido persistido.
+Resultado esperado: `201 Created`.
 
-O que isso demonstra:
-- contrato validado no `contratos-service`
-- estoque verificado e baixado no `compras-service`
-- venda persistida no `vendas-service`
-- `X-Correlation-ID` propagado por todos os serviços
-
----
-
-### Cenário 2 — Falha comercial (contrato inválido)
-
-Alterar o contrato para status suspenso:
+### 11.4 Falha comercial
 
 ```bash
 curl -s -X PATCH "http://localhost:8080/api/contratos/$CONTRATO_ID/status?status=SUSPENSO" | jq .
-```
 
-Confirmar a invalidação do contrato:
-
-```bash
-curl -s "http://localhost:8080/api/contratos/$CONTRATO_ID/validacao" | jq .
-```
-
-Tentar criar a venda novamente:
-
-```bash
 curl -i -X POST http://localhost:8080/api/vendas/pedidos \
   -H "Content-Type: application/json" \
   -d '{
@@ -134,29 +287,20 @@ curl -i -X POST http://localhost:8080/api/vendas/pedidos \
     "contratoId": '"$CONTRATO_ID"',
     "itens": [{
       "insumoId": '"$INSUMO_ID"',
-      "nomeInsumo": "Insumo Demo",
+      "nomeInsumo": "Insumo Demo '"$RUN_ID"'",
       "quantidade": 2,
       "precoUnitario": 10.00
     }]
   }'
 ```
 
-**Resultado esperado:** `422 Unprocessable Entity` porque o contrato não está mais elegível para uso.
+Resultado esperado: `422 Unprocessable Entity`.
 
----
-
-### Cenário 3 — Falha operacional (estoque insuficiente)
-
-Reativar o contrato e tentar vender mais do que o estoque disponível:
+### 11.5 Falha operacional
 
 ```bash
-# Reativar contrato
 curl -s -X PATCH "http://localhost:8080/api/contratos/$CONTRATO_ID/status?status=ATIVO" | jq .
 
-# Confirmar indisponibilidade do estoque para a quantidade desejada
-curl -s "http://localhost:8080/api/compras/insumos/$INSUMO_ID/disponibilidade?quantidade=99999" | jq .
-
-# Tentar venda com quantidade maior que o estoque
 curl -i -X POST http://localhost:8080/api/vendas/pedidos \
   -H "Content-Type: application/json" \
   -d '{
@@ -164,58 +308,25 @@ curl -i -X POST http://localhost:8080/api/vendas/pedidos \
     "contratoId": '"$CONTRATO_ID"',
     "itens": [{
       "insumoId": '"$INSUMO_ID"',
-      "nomeInsumo": "Insumo Demo",
+      "nomeInsumo": "Insumo Demo '"$RUN_ID"'",
       "quantidade": 99999,
       "precoUnitario": 10.00
     }]
   }'
 ```
 
-**Resultado esperado:** `422 Unprocessable Entity` por indisponibilidade de estoque.
+Resultado esperado: `422 Unprocessable Entity`.
 
----
+## 12. Swagger e documentação da API
 
-## Observabilidade
+| Serviço | URL |
+|---|---|
+| Swagger global | http://localhost:8080/swagger-ui.html |
+| Swagger compras | http://localhost:8081/swagger-ui.html |
+| Swagger contratos | http://localhost:8082/swagger-ui.html |
+| Swagger vendas | http://localhost:8083/swagger-ui.html |
 
-### Rastrear uma requisição no Jaeger
-
-1. Acesse http://localhost:16686
-2. Selecione o serviço `vendas-service`
-3. Clique em **Find Traces**
-4. Abra um trace do `POST /api/vendas/pedidos` e veja os spans de cada serviço
-
-Ou busque pelo `X-Correlation-ID` retornado no header da resposta:
-
-```bash
-curl -si -X POST http://localhost:8080/api/vendas/pedidos \
-  -H "Content-Type: application/json" \
-  -d '{ "nomeCliente": "Cliente Demo", "contratoId": '"$CONTRATO_ID"', "itens": [{ "insumoId": '"$INSUMO_ID"', "nomeInsumo": "Insumo Demo", "quantidade": 1, "precoUnitario": 10.00 }] }' \
-  | grep -i "x-correlation"
-```
-
-### Logs no Grafana (Loki)
-
-1. Acesse http://localhost:3000
-2. Vá em **Explore** → datasource **Loki**
-3. Use a query: `{container=~"vendas-service|contratos-service|compras-service"}`
-4. Filtre pelo `correlationId` de uma requisição específica
-
-### Métricas no Prometheus / Grafana
-
-- Prometheus direto: http://localhost:9090
-- Grafana dashboards: http://localhost:3000
-- Métricas disponíveis: latência, throughput, JVM, Resilience4j (circuit breaker, retry)
-
-### Health checks
-
-```bash
-curl http://localhost:8080/health          # api-gateway
-curl http://localhost:8761/health          # eureka
-```
-
----
-
-## Testes
+## 13. Testes
 
 ### Unitários
 
@@ -223,27 +334,38 @@ curl http://localhost:8761/health          # eureka
 make test
 ```
 
-### Performance (30s, 8 workers)
+### Performance
 
 ```bash
 DURATION_SECONDS=30 WORKERS=8 make perf
 ```
 
-**Referência:** use os números consolidados em [`doc/performance.md`](doc/performance.md), que refletem a execução validada mais recente.
+Arquivos gerados:
 
-Resultados documentados em [`doc/performance.md`](doc/performance.md).
+- [tests/performance/results/summary.json](tests/performance/results/summary.json)
+- [tests/performance/results/summary.md](tests/performance/results/summary.md)
 
-> Aguardar ~60s após o `docker compose up` antes de rodar o teste (propagação do cache do Eureka).
+## 14. Artefatos da disciplina
 
----
-
-## Documentação
-
-| Documento | Descrição |
+| Artefato | Local |
 |---|---|
-| [`doc/arquitetura.md`](doc/arquitetura.md) | Documento de arquitetura consolidado |
-| [`doc/adr-001-escolha-banco.md`](doc/adr-001-escolha-banco.md) | ADR-001: Escolha do banco de dados por serviço |
-| [`doc/adr-002-comunicacao-feign.md`](doc/adr-002-comunicacao-feign.md) | ADR-002: Comunicação via OpenFeign + Resilience4j |
-| [`doc/adr-003-observabilidade.md`](doc/adr-003-observabilidade.md) | ADR-003: Estratégia de observabilidade |
-| [`doc/performance.md`](doc/performance.md) | Resultados de performance e aderência aos SLOs |
-| [`doc/peer-review-checklist.md`](doc/peer-review-checklist.md) | Checklist de Peer Review |
+| Documento de arquitetura consolidado | [doc/arquitetura.md](doc/arquitetura.md) |
+| ADR-001 | [doc/adr-001-escolha-banco.md](doc/adr-001-escolha-banco.md) |
+| ADR-002 | [doc/adr-002-comunicacao-feign.md](doc/adr-002-comunicacao-feign.md) |
+| ADR-003 | [doc/adr-003-observabilidade.md](doc/adr-003-observabilidade.md) |
+| Resultado de performance | [doc/performance.md](doc/performance.md) |
+| Checklist de Peer Review | [doc/peer-review-checklist.md](doc/peer-review-checklist.md) |
+| Fluxo da apresentação | [doc/fluxo-apresentacao.md](doc/fluxo-apresentacao.md) |
+
+## 15. Critérios de avaliação atendidos
+
+Este repositório atende à estrutura solicitada no plano de ensino com:
+
+- documento de arquitetura consolidado;
+- mínimo de três ADRs;
+- microsserviços funcionais com lógica de negócio;
+- `/health` implementado;
+- logging estruturado com `Correlation ID`;
+- `docker compose up --build` para o ambiente completo;
+- medição de performance com `p50`, `p95`, `p99` e throughput;
+- checklist de Peer Review.
