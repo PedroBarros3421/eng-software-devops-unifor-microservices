@@ -12,20 +12,20 @@ O padrão **Database per Service** exige que cada serviço tenha sua própria ba
 
 ## Alternativas Consideradas
 
-| Alternativa | Prós | Contras |
-|---|---|---|
-| MongoDB para vendas-service | Flexibilidade de esquema para itens de pedido | Dificulta integridade referencial com contratos e insumos, curva de aprendizado |
-| PostgreSQL para todos (escolhido) | Garantia ACID para fluxo de venda que envolve baixa de estoque, operação unificada | Ligeiramente menos flexível para dados semi-estruturados |
+| Alternativa                       | Prós                                                                               | Contras                                                                         |
+| --------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| MongoDB para vendas-service       | Flexibilidade de esquema para itens de pedido                                      | Dificulta integridade referencial com contratos e insumos, curva de aprendizado |
+| PostgreSQL para todos (escolhido) | Garantia ACID para fluxo de venda que envolve baixa de estoque, operação unificada | Ligeiramente menos flexível para dados semi-estruturados                        |
 
 ## Decisão
 
 Adotar **PostgreSQL como banco único** para os três serviços de negócio, com isolamento lógico por banco de dados separado por serviço:
 
-| Serviço | Banco | Database | Justificativa |
-|---|---|---|---|
-| compras-service | PostgreSQL | `compras_db` | Dados relacionais, integridade transacional, consultas com JOIN entre insumos e pedidos |
-| contratos-service | PostgreSQL | `contratos_db` | Esquema fixo e estruturado, consultas por vigência e status, auditoria |
-| vendas-service | PostgreSQL | `vendas_db` | Integridade transacional necessária para garantir consistência entre registro da venda e dados relacionados |
+| Serviço           | Banco      | Database       | Justificativa                                                                                               |
+| ----------------- | ---------- | -------------- | ----------------------------------------------------------------------------------------------------------- |
+| compras-service   | PostgreSQL | `compras_db`   | Dados relacionais, integridade transacional, consultas com JOIN entre insumos e pedidos                     |
+| contratos-service | PostgreSQL | `contratos_db` | Esquema fixo e estruturado, consultas por vigência e status, auditoria                                      |
+| vendas-service    | PostgreSQL | `vendas_db`    | Integridade transacional necessária para garantir consistência entre registro da venda e dados relacionados |
 
 > **Nota de revisão (Peer Review 2026-04-25):** A decisão inicial previa MongoDB para o `vendas-service` como demonstração de poliglotismo. Após peer review, foi identificado que o uso de MongoDB no escopo atual traria complexidade operacional sem benefício real de flexibilidade de esquema, uma vez que o modelo de Venda é estruturado e o fluxo exige consistência transacional. A decisão foi revisada para PostgreSQL, simplificando a infraestrutura e alinhando a persistência ao padrão transacional exigido.
 
@@ -34,29 +34,31 @@ Em ambiente de desenvolvimento, os três bancos rodam na mesma instância Postgr
 ## Consequências
 
 **Positivo:**
+
 - Cada serviço pode evoluir seu esquema independentemente sem impactar os demais
 - Operação simplificada: um único tipo de banco a manter
 - Garantia ACID em todos os serviços, incluindo o fluxo de venda que envolve múltiplos serviços
 - Uso de Flyway para versionamento de schema em todos os serviços
 
 **Negativo:**
+
 - Consultas que atravessam domínios (ex: relatório consolidado) requerem agregação no nível da aplicação
 - Sem transações distribuídas (necessário padrão Saga para operações cross-service)
 - Perde-se a demonstração prática de poliglotismo de persistência em ambiente de desenvolvimento
 
 ## Histórico de Revisões
 
-| Campo | Valor |
-|---|---|
-| Sistema | Sistema de Gestão Comercial — Microsserviços |
-| Autores | Edval Júnior, Iago Barbosa, Mary Santos, Pedro Barros, Victor Kauan |
-| Revisores | Equipe do grupo (revisão interna) |
-| Supersede | — (primeiro ADR do projeto) |
-| Supersedido por | — |
+| Campo           | Valor                                                               |
+| --------------- | ------------------------------------------------------------------- |
+| Sistema         | Sistema de Gestão Comercial — Microsserviços                        |
+| Autores         | Edval Júnior, Iago Barbosa, Mary Santos, Pedro Barros, Victor Kauan |
+| Revisores       | Equipe do grupo (revisão interna)                                   |
+| Supersede       | — (primeiro ADR do projeto)                                         |
+| Supersedido por | —                                                                   |
 
-| Versão | Data | Autor | Alteração |
-|---|---|---|---|
-| 1.0 | 2026-04-12 | Equipe | Criação inicial — previa MongoDB para o `vendas-service` |
-| 1.1 | 2026-04-25 | Equipe | Revisão após peer review: substituição de MongoDB por PostgreSQL no `vendas-service`; adicionada seção de alternativas consideradas |
+| Versão | Data       | Autor  | Alteração                                                                                                                           |
+| ------ | ---------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0    | 2026-04-12 | Equipe | Criação inicial — previa MongoDB para o `vendas-service`                                                                            |
+| 1.1    | 2026-04-25 | Equipe | Revisão após peer review: substituição de MongoDB por PostgreSQL no `vendas-service`; adicionada seção de alternativas consideradas |
 
 **Status atual:** Aceito
