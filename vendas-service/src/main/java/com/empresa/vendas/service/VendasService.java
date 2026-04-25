@@ -2,6 +2,7 @@ package com.empresa.vendas.service;
 
 import com.empresa.vendas.client.ContratosClient;
 import com.empresa.vendas.client.dto.ContratoDTO;
+import com.empresa.vendas.client.dto.ContratoStatusResponseDTO;
 import com.empresa.vendas.domain.Pedido;
 import com.empresa.vendas.dtos.input.PedidoInputDTO;
 import com.empresa.vendas.dtos.output.PedidoOutputDTO;
@@ -18,6 +19,9 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+
+import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
 
 @Slf4j
 @Service
@@ -61,6 +65,14 @@ public class VendasService {
     }
 
     public PedidoOutputDTO criarPedido(PedidoInputDTO pedidoInputDTO) {
+
+        ContratoStatusResponseDTO contratoStatusResponseDTO = contratosClient.validarContrato(pedidoInputDTO.contratoId());
+        if (nonNull(contratoStatusResponseDTO) && !contratoStatusResponseDTO.valido())
+            throw new RuntimeException("Contrato inválido ou inativo: " + pedidoInputDTO.contratoId());
+
+        if (isNull(contratoStatusResponseDTO))
+            throw new RuntimeException("Não foi possível validar o contrato: " + pedidoInputDTO.contratoId());
+
         BigDecimal total = pedidoInputDTO.itens().stream()
                 .map(item -> item.precoUnitario().multiply(BigDecimal.valueOf(item.quantidade())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -69,6 +81,8 @@ public class VendasService {
         pedido.setValorTotal(total);
         pedido.setStatus(StatusPedidoVenda.PENDENTE);
         pedido.setDataPedido(LocalDate.now());
+        pedido.setNomeCliente(pedidoInputDTO.nomeCliente());
+        pedido.setContratoId(pedidoInputDTO.contratoId());
         pedido = pedidoRepository.save(pedido);
 
         return new PedidoOutputDTO(
