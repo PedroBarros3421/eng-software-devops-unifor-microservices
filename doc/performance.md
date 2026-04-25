@@ -201,7 +201,7 @@ O SLA foi definido para a aplicação como um todo, usando os indicadores globai
 
 | SLA da aplicação | Resultado | SLI | Status |
 |---|---|---|---|
-| Disponibilidade técnica global | >= 95,00% | 100,00% | OK |
+| Disponibilidade técnica global | >= 99,00% | 100,00% | OK |
 | Latência P95 global | <= 800,00 ms | 61,97 ms | OK |
 | Latência P99 global | <= 1500,00 ms | 83,16 ms | OK |
 

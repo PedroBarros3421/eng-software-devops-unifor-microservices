@@ -154,7 +154,7 @@ Com base na execução `DURATION_SECONDS=30 WORKERS=8 make perf`:
 | Fluxo principal | Sucesso de negócio | >= 99,00% | 100,00% | OK |
 | Fluxo principal | Latência P95 | <= 500 ms | 70,21 ms | OK |
 | Fluxo principal | Latência P99 | <= 1000 ms | 89,15 ms | OK |
-| Aplicação | Disponibilidade técnica global | >= 95,00% | 100,00% | OK |
+| Aplicação | Disponibilidade técnica global | >= 99,00% | 100,00% | OK |
 | Aplicação | Latência P95 global | <= 800 ms | 61,97 ms | OK |
 | Aplicação | Latência P99 global | <= 1500 ms | 83,16 ms | OK |
 
