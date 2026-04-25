@@ -57,6 +57,12 @@ resilience4j:
         exponentialBackoffMultiplier: 2
 
 management:
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      slo:
+        http.server.requests: 50ms,100ms,200ms,500ms,1s,2s
   endpoints:
     web:
       exposure:

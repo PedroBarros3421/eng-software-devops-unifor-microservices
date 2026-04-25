@@ -125,18 +125,40 @@ vendas-service
 
 ---
 
-## 5. SLOs (Service Level Objectives)
+## 5. SLI, SLO e SLA
 
-Os SLOs abaixo foram definidos para o endpoint principal (`POST /api/vendas/pedidos`) sob carga de 8 workers simultâneos:
+### 5.1 Definições usadas no projeto
 
-| Indicador | Meta SLO | Meta SLA | Resultado (30s, 8 workers) | Status |
+| Conceito | Definição adotada |
+|---|---|
+| Métrica | Valor observável do sistema, como throughput, tempo de resposta ou taxa de erro |
+| SLI | Métrica formalizada com fórmula, unidade, escopo e janela de observação |
+| SLO | Meta definida para um SLI |
+| SLA | Compromisso global assumido com base em um conjunto de SLOs |
+
+### 5.2 Estrutura adotada
+
+Para deixar o modelo explícito:
+
+- **microsserviços** possuem **SLIs** e **SLOs** próprios;
+- o **fluxo principal de venda** possui **SLIs** e **SLOs** ponta a ponta;
+- a **aplicação como um todo** possui **SLIs globais** e um **SLA** agregado.
+
+### 5.3 Resultados principais
+
+Com base na execução `DURATION_SECONDS=30 WORKERS=8 make perf`:
+
+| Nível | Indicador | Meta | Resultado | Status |
 |---|---|---|---|---|
-| Disponibilidade técnica | ≥ 99% | ≥ 95% | 100% | ✓ OK |
-| Sucesso de negócio | ≥ 99% | ≥ 95% | 100% | ✓ OK |
-| P95 latência | ≤ 500 ms | ≤ 800 ms | 63,72 ms | ✓ OK |
-| P99 latência | ≤ 1000 ms | ≤ 1500 ms | 75,91 ms | ✓ OK |
+| Fluxo principal | Disponibilidade técnica | >= 99,00% | 100,00% | OK |
+| Fluxo principal | Sucesso de negócio | >= 99,00% | 100,00% | OK |
+| Fluxo principal | Latência P95 | <= 500 ms | 70,21 ms | OK |
+| Fluxo principal | Latência P99 | <= 1000 ms | 89,15 ms | OK |
+| Aplicação | Disponibilidade técnica global | >= 95,00% | 100,00% | OK |
+| Aplicação | Latência P95 global | <= 800 ms | 61,97 ms | OK |
+| Aplicação | Latência P99 global | <= 1500 ms | 83,16 ms | OK |
 
-Resultados completos em [`doc/performance.md`](./performance.md).
+Resultados completos, fórmulas e SLIs por serviço estão em [`doc/performance.md`](./performance.md).
 
 ---
 
