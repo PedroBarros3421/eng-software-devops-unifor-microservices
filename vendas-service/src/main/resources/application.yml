@@ -35,7 +35,7 @@ eureka:
 logging:
   include-application-name: false
   pattern:
-    correlation: "[${spring.application.name:vendas-service},%X{traceId:-},%X{spanId:-}] "
+    correlation: "[${spring.application.name:vendas-service},%X{correlationId:-},%X{traceId:-},%X{spanId:-}] "
 
 # Configuração do Resilience4j
 resilience4j:

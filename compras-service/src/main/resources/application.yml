@@ -27,7 +27,7 @@ eureka:
 logging:
   include-application-name: false
   pattern:
-    correlation: "[${spring.application.name:compras-service},%X{traceId:-},%X{spanId:-}] "
+    correlation: "[${spring.application.name:compras-service},%X{correlationId:-},%X{traceId:-},%X{spanId:-}] "
 
 management:
   endpoints:
