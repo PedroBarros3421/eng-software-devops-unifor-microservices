@@ -2,6 +2,7 @@ package com.empresa.contratos.service;
 
 import com.empresa.contratos.domain.Contrato;
 import com.empresa.contratos.dto.ContratoStatusDTO;
+import com.empresa.contratos.exception.ResourceNotFoundException;
 import com.empresa.contratos.repository.ContratoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,12 +27,12 @@ public class ContratosService {
 
     public Contrato buscarPorId(Long id) {
         return contratoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Contrato não encontrado: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Contrato não encontrado: " + id));
     }
 
     public Contrato buscarPorNumero(String numero) {
         return contratoRepository.findByNumero(numero)
-                .orElseThrow(() -> new RuntimeException("Contrato não encontrado: " + numero));
+                .orElseThrow(() -> new ResourceNotFoundException("Contrato não encontrado: " + numero));
     }
 
     @Transactional
@@ -52,15 +53,21 @@ public class ContratosService {
     }
 
     public ContratoStatusDTO validarContrato(Long id) {
-
         LocalDate hoje = LocalDate.now();
+        Contrato contrato = buscarPorId(id);
 
-        Contrato contrato = contratoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Contrato não encontrado: " + id));
+        if (contrato.getDataInicio().isAfter(hoje)) {
+            return new ContratoStatusDTO(
+                    id,
+                    false,
+                    contrato.getStatus().name(),
+                    "Contrato ainda não iniciou. Vigência a partir de " + contrato.getDataInicio()
+            );
+        }
 
         if (Contrato.StatusContrato.ATIVO.equals(contrato.getStatus()) 
                 && contrato.getDataFim().isBefore(hoje)) {
-            atualizarStatus(id, Contrato.StatusContrato.ENCERRADO);
+            contrato = atualizarStatus(id, Contrato.StatusContrato.ENCERRADO);
 
             return new ContratoStatusDTO(id, false, contrato.getStatus().name(),
                     "A vigência do contrato terminou em " + contrato.getDataFim());

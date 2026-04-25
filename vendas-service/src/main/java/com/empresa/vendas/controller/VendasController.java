@@ -5,7 +5,6 @@ import com.empresa.vendas.dtos.input.PedidoInputDTO;
 import com.empresa.vendas.dtos.output.PedidoOutputDTO;
 import com.empresa.vendas.enums.StatusPedidoVenda;
 import com.empresa.vendas.service.VendasService;
-import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,7 +21,6 @@ public class VendasController implements SwaggerVendasController {
     private final VendasService vendasService;
 
     @PostMapping("/pedidos")
-    @RateLimiter(name = "vendas-api")
     public ResponseEntity<PedidoOutputDTO> criarPedido(@RequestBody PedidoInputDTO pedidoInputDTO) {
         return ResponseEntity.status(HttpStatus.CREATED).body(vendasService.criarPedido(pedidoInputDTO));
     }

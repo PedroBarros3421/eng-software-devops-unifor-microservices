@@ -1,0 +1,33 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: [ "prometheus:9090" ]
+
+  - job_name: api-gateway
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: [ "api-gateway:8080" ]
+
+  - job_name: compras-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: [ "compras-service:8081" ]
+
+  - job_name: contratos-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: [ "contratos-service:8082" ]
+
+  - job_name: vendas-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: [ "vendas-service:8083" ]
+
+  - job_name: eureka-server
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: [ "eureka-server:8761" ]

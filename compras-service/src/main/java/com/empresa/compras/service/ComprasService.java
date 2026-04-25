@@ -1,10 +1,15 @@
 package com.empresa.compras.service;
 
 import com.empresa.compras.controller.dto.InsumoPatchDTO;
+import com.empresa.compras.controller.dto.BaixaEstoqueInputDTO;
+import com.empresa.compras.controller.dto.BaixaEstoqueResponseDTO;
+import com.empresa.compras.controller.dto.DisponibilidadeInsumoDTO;
 import com.empresa.compras.controller.dto.PedidoPatchInput;
 import com.empresa.compras.domain.Insumo;
 import com.empresa.compras.domain.PedidoCompra;
-import com.empresa.compras.domain.enuns.StatusPedido;
+import com.empresa.compras.domain.enums.StatusPedido;
+import com.empresa.compras.exception.BusinessException;
+import com.empresa.compras.exception.ResourceNotFoundException;
 import com.empresa.compras.repository.InsumoRepository;
 import com.empresa.compras.repository.PedidoCompraRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +33,7 @@ public class ComprasService {
 
     public Insumo buscarInsumoPorId(Long id) {
         return insumoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Insumo não encontrado: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Insumo não encontrado: " + id));
     }
 
     @Transactional
@@ -64,21 +69,56 @@ public class ComprasService {
         insumoRepository.deleteById(id);
     }
 
+    public DisponibilidadeInsumoDTO consultarDisponibilidade(Long id, Integer quantidade) {
+        if (quantidade == null || quantidade <= 0) {
+            throw new BusinessException("A quantidade deve ser maior que 0");
+        }
+
+        Insumo insumo = buscarInsumoPorId(id);
+        return new DisponibilidadeInsumoDTO(
+                id,
+                insumo.getQuantidadeEstoque() >= quantidade,
+                quantidade,
+                insumo.getQuantidadeEstoque()
+        );
+    }
+
+    @Transactional
+    public BaixaEstoqueResponseDTO baixarEstoque(Long id, BaixaEstoqueInputDTO input) {
+        if (input.getQuantidade() == null || input.getQuantidade() <= 0) {
+            throw new BusinessException("A quantidade deve ser maior que 0");
+        }
+
+        Insumo insumo = buscarInsumoPorId(id);
+        if (insumo.getQuantidadeEstoque() < input.getQuantidade()) {
+            throw new BusinessException("Estoque insuficiente para o insumo: " + id);
+        }
+
+        insumo.setQuantidadeEstoque(insumo.getQuantidadeEstoque() - input.getQuantidade());
+        insumoRepository.save(insumo);
+
+        return new BaixaEstoqueResponseDTO(
+                id,
+                input.getQuantidade(),
+                insumo.getQuantidadeEstoque()
+        );
+    }
+
     public List<PedidoCompra> listarPedidos() {
         return pedidoCompraRepository.findAll();
     }
 
     public PedidoCompra buscarPedidoPorId(Long id) {
         return pedidoCompraRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Pedido de compra não encontrado: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Pedido de compra não encontrado: " + id));
     }
 
     @Transactional
     public PedidoCompra criarPedido(PedidoCompra pedido) {
-        Insumo insumo = buscarInsumoPorId(pedido.getInsumoId());
+        buscarInsumoPorId(pedido.getInsumoId());
 
         if (pedido.getQuantidade() <= 0) {
-            throw new RuntimeException("A quantidade deve ser maior que 0");
+            throw new BusinessException("A quantidade deve ser maior que 0");
         }
 
         pedido.setPrecoTotal(calcularPrecoTotal(pedido.getInsumoId(), pedido.getQuantidade()));
@@ -99,7 +139,7 @@ public class ComprasService {
         PedidoCompra pedido = buscarPedidoPorId(id);
 
         if(pedido.getStatus() == StatusPedido.CANCELADO || pedido.getStatus() == StatusPedido.ENTREGUE){
-            throw new RuntimeException("O pedido está cancelado ou entregue não sendo possivel atualizar");
+            throw new BusinessException("O pedido está cancelado ou entregue não sendo possivel atualizar");
         }
 
         if (patch.getNomeFornecedor() != null) {
@@ -108,10 +148,6 @@ public class ComprasService {
         if (patch.getQuantidade() != null) {
             pedido.setQuantidade(patch.getQuantidade());
             pedido.setPrecoTotal(calcularPrecoTotal(pedido.getInsumoId(), patch.getQuantidade()));
-        }
-
-        if (patch.getStatus() != null) {
-            pedido.setStatus(patch.getStatus());
         }
 
         if (patch.getDataPedido() != null) {
@@ -126,12 +162,12 @@ public class ComprasService {
         PedidoCompra pedido = buscarPedidoPorId(id);
 
         if (pedido.getStatus() == StatusPedido.CANCELADO) {
-            throw new RuntimeException("O pedido foi cancelado não sendo possivel troca de status");
+            throw new BusinessException("O pedido foi cancelado não sendo possivel troca de status");
         }
 
         if (novoStatus == StatusPedido.ENTREGUE && pedido.getStatus() != StatusPedido.ENTREGUE) {
             if (pedido.getStatus() != StatusPedido.APROVADO) {
-                throw new RuntimeException("O pedido deve estar aprovado para ser entregue");
+                throw new BusinessException("O pedido deve estar aprovado para ser entregue");
             }
 
             Insumo insumo = buscarInsumoPorId(pedido.getInsumoId());

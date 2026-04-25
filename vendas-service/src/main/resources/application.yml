@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: vendas-service
+  cloud:
+    openfeign:
+      micrometer:
+        enabled: true
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/vendas_db}
     username: ${DB_USER:postgres}
@@ -12,7 +16,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
@@ -21,15 +25,17 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
 
-app:
-  contratos-service-url: ${CONTRATOS_SERVICE_URL:http://localhost:8082}
-
 eureka:
   client:
     serviceUrl:
       defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
   instance:
     preferIpAddress: true
+
+logging:
+  include-application-name: false
+  pattern:
+    correlation: "[${spring.application.name:vendas-service},%X{correlationId:-},%X{traceId:-},%X{spanId:-}] "
 
 # Configuração do Resilience4j
 resilience4j:
@@ -50,24 +56,17 @@ resilience4j:
         enableExponentialBackoff: true
         exponentialBackoffMultiplier: 2
 
-  ratelimiter:
-    instances:
-      vendas-api:
-        limitForPeriod: 10
-        limitRefreshPeriod: 1s
-        timeoutDuration: 0
-
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,circuitbreakers,retries
+        include: health,info,circuitbreakers,retries,prometheus
   health:
     circuitbreakers:
       enabled: true
   tracing:
     sampling:
-      probability: 1.0  # Send 100% of traces (adjust for production)
+      probability: 1.0
   otlp:
     tracing:
-      endpoint: ${JAEGER_URL:http://localhost:4318/v1/traces} # Jaeger OTLP HTTP receiver
+      endpoint: ${JAEGER_URL:http://localhost:4318/v1/traces}
