@@ -6,7 +6,6 @@ import java.util.List;
 
 public record PedidoInputDTO(
         String nomeCliente,
-        BigDecimal valorTotal,
         LocalDate dataPedido,
         Long contratoId,
         List<ItemInputDTO> itens
