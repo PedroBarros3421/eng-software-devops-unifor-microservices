@@ -14,7 +14,6 @@ O padrão **Database per Service** exige que cada serviço tenha sua própria ba
 
 | Alternativa | Prós | Contras |
 |---|---|---|
-| PostgreSQL para todos | Operação unificada, familiaridade da equipe, ACID em todos os serviços | Menos expressivo para domínios com esquema variável |
 | MongoDB para vendas-service | Flexibilidade de esquema para itens de pedido | Dificulta integridade referencial com contratos e insumos, curva de aprendizado |
 | PostgreSQL para todos (escolhido) | Garantia ACID para fluxo de venda que envolve baixa de estoque, operação unificada | Ligeiramente menos flexível para dados semi-estruturados |
 
