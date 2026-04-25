@@ -15,14 +15,32 @@ spring:
           uri: lb://compras-service
           predicates:
             - Path=/api/compras/**
+        - id: compras-openapi
+          uri: lb://compras-service
+          predicates:
+            - Path=/v3/api-docs/compras
+          filters:
+            - SetPath=/v3/api-docs
         - id: contratos-service
           uri: lb://contratos-service
           predicates:
             - Path=/api/contratos/**
+        - id: contratos-openapi
+          uri: lb://contratos-service
+          predicates:
+            - Path=/v3/api-docs/contratos
+          filters:
+            - SetPath=/v3/api-docs
         - id: vendas-service
           uri: lb://vendas-service
           predicates:
             - Path=/api/vendas/**
+        - id: vendas-openapi
+          uri: lb://vendas-service
+          predicates:
+            - Path=/v3/api-docs/vendas
+          filters:
+            - SetPath=/v3/api-docs
 
 eureka:
   client:
@@ -47,3 +65,18 @@ management:
   otlp:
     tracing:
       endpoint: ${JAEGER_URL:http://localhost:4318/v1/traces}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - name: api-gateway
+        url: /v3/api-docs
+      - name: compras-service
+        url: /v3/api-docs/compras
+      - name: contratos-service
+        url: /v3/api-docs/contratos
+      - name: vendas-service
+        url: /v3/api-docs/vendas

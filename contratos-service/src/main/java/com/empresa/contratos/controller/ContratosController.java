@@ -13,7 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/contratos")
 @RequiredArgsConstructor
-public class ContratosController {
+public class ContratosController implements SwaggerContratosController {
 
     private final ContratosService contratosService;
 
