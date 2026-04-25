@@ -110,10 +110,6 @@ public class ComprasService {
             pedido.setPrecoTotal(calcularPrecoTotal(pedido.getInsumoId(), patch.getQuantidade()));
         }
 
-        if (patch.getStatus() != null) {
-            pedido.setStatus(patch.getStatus());
-        }
-
         if (patch.getDataPedido() != null) {
             pedido.setDataPedido(patch.getDataPedido());
         }
