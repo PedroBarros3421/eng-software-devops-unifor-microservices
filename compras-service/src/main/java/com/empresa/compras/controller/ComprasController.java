@@ -19,7 +19,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/compras")
 @RequiredArgsConstructor
-public class ComprasController {
+public class ComprasController implements SwaggerComprasController {
 
     private final ComprasService comprasService;
 
