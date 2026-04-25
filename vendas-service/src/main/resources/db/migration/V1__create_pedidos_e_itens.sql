@@ -24,5 +24,4 @@ CREATE TABLE IF NOT EXISTS itens (
         ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_itens_pedido_id ON itens (id);
-
+CREATE INDEX IF NOT EXISTS idx_itens_pedido_id ON itens (pedido_id);
