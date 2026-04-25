@@ -2,7 +2,7 @@
 
 ## Contexto
 
-O `vendas-service` precisa consultar dados do `contratos-service` para validar contratos vinculados a pedidos de venda, e do `compras-service` para verificar e baixar estoque. Foi necessário definir:
+O `vendas-service` precisa consultar dados do `contratos-service` para validar contratos vinculados a pedidos de venda e do `compras-service` para verificar e baixar estoque. Foi necessário definir:
 
 1. O protocolo de comunicação entre microsserviços
 2. A estratégia de resiliência para lidar com falhas temporárias ou indisponibilidade
