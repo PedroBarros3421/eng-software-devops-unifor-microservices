@@ -1,5 +1,3 @@
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
 CREATE TABLE IF NOT EXISTS pedidos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nome_cliente VARCHAR(255) NOT NULL,
@@ -26,4 +24,4 @@ CREATE TABLE IF NOT EXISTS itens (
         ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_itens_pedido_id ON itens (pedido_id);
+CREATE INDEX IF NOT EXISTS idx_itens_pedido_id ON itens (id);

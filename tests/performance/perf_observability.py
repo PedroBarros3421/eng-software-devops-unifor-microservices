@@ -16,13 +16,39 @@ from pathlib import Path
 from typing import Any
 
 import requests
-from requests import Response, Session
+from requests import Session
 from requests.exceptions import RequestException
 from rich.console import Console
 from rich.table import Table
 
 
 console = Console()
+DEFAULT_OUTPUT_DIR = Path("tests/performance/results")
+
+SERVICE_OPERATION_MAP = {
+    "contratos-service": "list_contracts",
+    "compras-service": "list_inventory",
+    "vendas-service": "create_sale",
+}
+
+FLOW_OPERATION_MAP = {
+    "fluxo_venda_fim_a_fim": "create_sale",
+}
+
+DEFAULT_SERVICE_SLOS = {
+    "contratos-service": {"availability": 0.99, "p95_ms": 200.0, "p99_ms": 400.0},
+    "compras-service": {"availability": 0.99, "p95_ms": 250.0, "p99_ms": 500.0},
+    "vendas-service": {"availability": 0.99, "p95_ms": 500.0, "p99_ms": 1000.0},
+}
+
+DEFAULT_FLOW_SLOS = {
+    "fluxo_venda_fim_a_fim": {
+        "availability": 0.99,
+        "business_success": 0.99,
+        "p95_ms": 500.0,
+        "p99_ms": 1000.0,
+    }
+}
 
 
 @dataclass
@@ -35,9 +61,6 @@ class ResponseResult:
     ok: bool
     business_ok: bool
     error: str | None = None
-
-
-DEFAULT_OUTPUT_DIR = Path("tests/performance/results")
 
 
 def env_float(name: str, default: float) -> float:
@@ -90,6 +113,14 @@ def percentile(values: list[float], p: float) -> float:
     return ordered[lower] * (1 - weight) + ordered[upper] * weight
 
 
+def evaluate_latency(value: float, target: float) -> str:
+    return "OK" if value <= target else "FAIL"
+
+
+def evaluate_availability(value: float, target: float) -> str:
+    return "OK" if value >= target else "FAIL"
+
+
 def build_markdown(summary: dict[str, Any]) -> str:
     lines = [
         "# Performance Summary",
@@ -97,32 +128,93 @@ def build_markdown(summary: dict[str, Any]) -> str:
         f"- Base URL: `{summary['base_url']}`",
         f"- Duration: `{summary['duration_seconds']}s`",
         f"- Workers: `{summary['workers']}`",
-        f"- Pesos de carga: `contratos={summary['weights']['list_contracts']}, estoque={summary['weights']['list_inventory']}, vendas={summary['weights']['create_sale']}`",
+        (
+            f"- Pesos de carga: `contratos={summary['weights']['list_contracts']}, "
+            f"estoque={summary['weights']['list_inventory']}, vendas={summary['weights']['create_sale']}`"
+        ),
         f"- Total requests: `{summary['total_requests']}`",
-        f"- Throughput médio: `{summary['throughput_rps']:.2f} req/s`",
+        f"- Throughput médio global: `{summary['throughput_rps']:.2f} req/s`",
         "",
-        "## SLI Medidos",
+        "## SLA da Aplicação",
         "",
-        f"- Disponibilidade técnica: `{summary['sli']['availability'] * 100:.2f}%`",
-        f"- Sucesso de negócio: `{summary['sli']['business_success'] * 100:.2f}%`",
-        f"- Latência P50 global: `{summary['global_percentiles']['p50_ms']:.2f} ms`",
-        f"- Latência P95 global: `{summary['global_percentiles']['p95_ms']:.2f} ms`",
-        f"- Latência P99 global: `{summary['global_percentiles']['p99_ms']:.2f} ms`",
+        f"- Disponibilidade global (SLI): `{summary['application']['sli']['availability'] * 100:.2f}%`",
+        f"- Sucesso de negócio global (SLI): `{summary['application']['sli']['business_success'] * 100:.2f}%`",
+        f"- P50 global: `{summary['global_percentiles']['p50_ms']:.2f} ms`",
+        f"- P95 global: `{summary['global_percentiles']['p95_ms']:.2f} ms`",
+        f"- P99 global: `{summary['global_percentiles']['p99_ms']:.2f} ms`",
+        f"- SLA disponibilidade >= {summary['application']['targets']['availability'] * 100:.2f}% -> {summary['application']['evaluation']['availability']}",
+        f"- SLA P95 <= {summary['application']['targets']['p95_ms']:.2f} ms -> {summary['application']['evaluation']['p95']}",
+        f"- SLA P99 <= {summary['application']['targets']['p99_ms']:.2f} ms -> {summary['application']['evaluation']['p99']}",
         "",
-        "## Metas",
+        "## SLIs por Microsserviço",
         "",
-        f"- SLO disponibilidade >= {summary['targets']['slo']['availability'] * 100:.2f}% -> {summary['evaluations']['slo']['availability']}",
-        f"- SLO P95 <= {summary['targets']['slo']['p95_ms']:.2f} ms -> {summary['evaluations']['slo']['p95']}",
-        f"- SLO P99 <= {summary['targets']['slo']['p99_ms']:.2f} ms -> {summary['evaluations']['slo']['p99']}",
-        f"- SLA disponibilidade >= {summary['targets']['sla']['availability'] * 100:.2f}% -> {summary['evaluations']['sla']['availability']}",
-        f"- SLA P95 <= {summary['targets']['sla']['p95_ms']:.2f} ms -> {summary['evaluations']['sla']['p95']}",
-        f"- SLA P99 <= {summary['targets']['sla']['p99_ms']:.2f} ms -> {summary['evaluations']['sla']['p99']}",
-        "",
-        "## Percentis por Operação",
-        "",
-        "| Operação | Requests | Erros | P50 | P95 | P99 |",
-        "|---|---:|---:|---:|---:|---:|",
+        "| Microsserviço | Operação de referência | Disponibilidade | Sucesso de negócio | P50 | P95 | P99 | Throughput |",
+        "|---|---|---:|---:|---:|---:|---:|---:|",
     ]
+
+    for service_name, values in summary["services"].items():
+        lines.append(
+            f"| {service_name} | `{values['operation']}` | "
+            f"{values['sli']['availability'] * 100:.2f}% | "
+            f"{values['sli']['business_success'] * 100:.2f}% | "
+            f"{values['percentiles']['p50_ms']:.2f} ms | "
+            f"{values['percentiles']['p95_ms']:.2f} ms | "
+            f"{values['percentiles']['p99_ms']:.2f} ms | "
+            f"{values['throughput_rps']:.2f} req/s |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## SLOs por Microsserviço",
+            "",
+            "| Microsserviço | Meta disponibilidade | Resultado | Meta P95 | Resultado | Meta P99 | Resultado |",
+            "|---|---:|---|---:|---|---:|---|",
+        ]
+    )
+
+    for service_name, values in summary["services"].items():
+        lines.append(
+            f"| {service_name} | "
+            f"{values['targets']['availability'] * 100:.2f}% | {values['evaluation']['availability']} | "
+            f"{values['targets']['p95_ms']:.2f} ms | {values['evaluation']['p95']} | "
+            f"{values['targets']['p99_ms']:.2f} ms | {values['evaluation']['p99']} |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## SLI e SLO do Fluxo Principal",
+            "",
+            "| Fluxo | Disponibilidade | Sucesso de negócio | P50 | P95 | P99 | Throughput | Meta disponibilidade | Resultado | Meta sucesso negócio | Resultado | Meta P95 | Resultado | Meta P99 | Resultado |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|---|---:|---|---:|---|---:|---|",
+        ]
+    )
+
+    for flow_name, values in summary["flows"].items():
+        lines.append(
+            f"| {flow_name} | "
+            f"{values['sli']['availability'] * 100:.2f}% | "
+            f"{values['sli']['business_success'] * 100:.2f}% | "
+            f"{values['percentiles']['p50_ms']:.2f} ms | "
+            f"{values['percentiles']['p95_ms']:.2f} ms | "
+            f"{values['percentiles']['p99_ms']:.2f} ms | "
+            f"{values['throughput_rps']:.2f} req/s | "
+            f"{values['targets']['availability'] * 100:.2f}% | {values['evaluation']['availability']} | "
+            f"{values['targets']['business_success'] * 100:.2f}% | {values['evaluation']['business_success']} | "
+            f"{values['targets']['p95_ms']:.2f} ms | {values['evaluation']['p95']} | "
+            f"{values['targets']['p99_ms']:.2f} ms | {values['evaluation']['p99']} |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Percentis por Operação",
+            "",
+            "| Operação | Requests | Erros | P50 | P95 | P99 |",
+            "|---|---:|---:|---:|---:|---:|",
+        ]
+    )
 
     for operation, values in summary["operations"].items():
         lines.append(
@@ -130,14 +222,7 @@ def build_markdown(summary: dict[str, Any]) -> str:
             f"{values['p50_ms']:.2f} ms | {values['p95_ms']:.2f} ms | {values['p99_ms']:.2f} ms |"
         )
 
-    lines.extend(
-        [
-            "",
-            "## Status por Operação",
-            "",
-        ]
-    )
-
+    lines.extend(["", "## Status por Operação", ""])
     for operation, values in summary["operations"].items():
         status_parts = [f"`{status}`: {count}" for status, count in values["statuses"].items()]
         lines.append(f"- {operation}: {', '.join(status_parts)}")
@@ -147,12 +232,13 @@ def build_markdown(summary: dict[str, Any]) -> str:
             "",
             "## Interpretação",
             "",
-            "- P50, P95 e P99 representam os percentis de latência medidos durante a execução.",
-            "- SLI são os indicadores efetivamente observados no teste.",
-            "- SLO e SLA são metas de referência configuradas no script para comparação.",
+            "- `SLI` é a métrica observada durante o teste.",
+            "- `SLO` é a meta interna definida por microsserviço e por fluxo principal.",
+            "- `SLA` é o compromisso global da aplicação como um todo.",
+            "- `contratos-service` e `compras-service` usam operações de leitura representativas do próprio domínio.",
+            "- `vendas-service` e o fluxo ponta a ponta usam `create_sale`, que envolve gateway, validação de contrato, validação de estoque, baixa de estoque e persistência da venda.",
         ]
     )
-
     return "\n".join(lines)
 
 
@@ -160,25 +246,58 @@ def render_console_summary(summary: dict[str, Any]) -> None:
     console.print("[bold]Performance Summary[/bold]")
     console.print(
         f"Base URL: {summary['base_url']} | Duration: {summary['duration_seconds']}s | "
-        f"Workers: {summary['workers']} | Throughput: {summary['throughput_rps']:.2f} req/s"
+        f"Workers: {summary['workers']} | Throughput global: {summary['throughput_rps']:.2f} req/s"
     )
     console.print(
-        "SLI availability: "
-        f"{summary['sli']['availability'] * 100:.2f}% | "
-        "Business success: "
-        f"{summary['sli']['business_success'] * 100:.2f}%"
+        "Aplicação | availability: "
+        f"{summary['application']['sli']['availability'] * 100:.2f}% | "
+        "business success: "
+        f"{summary['application']['sli']['business_success'] * 100:.2f}%"
     )
 
-    table = Table(title="Percentis por Operação")
-    table.add_column("Operação")
-    table.add_column("Requests", justify="right")
-    table.add_column("Erros", justify="right")
-    table.add_column("P50", justify="right")
-    table.add_column("P95", justify="right")
-    table.add_column("P99", justify="right")
+    services_table = Table(title="SLI por Microsserviço")
+    services_table.add_column("Microsserviço")
+    services_table.add_column("Operação")
+    services_table.add_column("Avail.", justify="right")
+    services_table.add_column("Biz.", justify="right")
+    services_table.add_column("P95", justify="right")
+    services_table.add_column("P99", justify="right")
+    for service_name, values in summary["services"].items():
+        services_table.add_row(
+            service_name,
+            values["operation"],
+            f"{values['sli']['availability'] * 100:.2f}%",
+            f"{values['sli']['business_success'] * 100:.2f}%",
+            f"{values['percentiles']['p95_ms']:.2f} ms",
+            f"{values['percentiles']['p99_ms']:.2f} ms",
+        )
+    console.print(services_table)
 
+    flow_table = Table(title="Fluxo Principal")
+    flow_table.add_column("Fluxo")
+    flow_table.add_column("Avail.", justify="right")
+    flow_table.add_column("Biz.", justify="right")
+    flow_table.add_column("P95", justify="right")
+    flow_table.add_column("P99", justify="right")
+    for flow_name, values in summary["flows"].items():
+        flow_table.add_row(
+            flow_name,
+            f"{values['sli']['availability'] * 100:.2f}%",
+            f"{values['sli']['business_success'] * 100:.2f}%",
+            f"{values['percentiles']['p95_ms']:.2f} ms",
+            f"{values['percentiles']['p99_ms']:.2f} ms",
+        )
+    console.print(flow_table)
+
+    op_table = Table(title="Percentis por Operação")
+    op_table.add_column("Operação")
+    op_table.add_column("Requests", justify="right")
+    op_table.add_column("Erros", justify="right")
+    op_table.add_column("P50", justify="right")
+    op_table.add_column("P95", justify="right")
+    op_table.add_column("P99", justify="right")
     for operation, values in summary["operations"].items():
-        table.add_row(
+        op_table.add_row(
             operation,
             str(values["requests"]),
             str(values["errors"]),
@@ -186,15 +305,7 @@ def render_console_summary(summary: dict[str, Any]) -> None:
             f"{values['p95_ms']:.2f} ms",
             f"{values['p99_ms']:.2f} ms",
         )
-    console.print(table)
-
-    status_table = Table(title="Status por Operação")
-    status_table.add_column("Operação")
-    status_table.add_column("Status")
-    for operation, values in summary["operations"].items():
-        parts = [f"{status}: {count}" for status, count in values["statuses"].items()]
-        status_table.add_row(operation, ", ".join(parts))
-    console.print(status_table)
+    console.print(op_table)
 
 
 class Runner:
@@ -211,7 +322,7 @@ class Runner:
         self.insumo_id: int | None = None
         self.thread_local = threading.local()
 
-        self.slo = {
+        self.global_slo = {
             "availability": args.slo_availability,
             "p95_ms": args.slo_p95_ms,
             "p99_ms": args.slo_p99_ms,
@@ -220,6 +331,31 @@ class Runner:
             "availability": args.sla_availability,
             "p95_ms": args.sla_p95_ms,
             "p99_ms": args.sla_p99_ms,
+        }
+        self.service_slos = {
+            "contratos-service": {
+                "availability": args.contracts_slo_availability,
+                "p95_ms": args.contracts_slo_p95_ms,
+                "p99_ms": args.contracts_slo_p99_ms,
+            },
+            "compras-service": {
+                "availability": args.inventory_slo_availability,
+                "p95_ms": args.inventory_slo_p95_ms,
+                "p99_ms": args.inventory_slo_p99_ms,
+            },
+            "vendas-service": {
+                "availability": args.sales_slo_availability,
+                "p95_ms": args.sales_slo_p95_ms,
+                "p99_ms": args.sales_slo_p99_ms,
+            },
+        }
+        self.flow_slos = {
+            "fluxo_venda_fim_a_fim": {
+                "availability": args.flow_slo_availability,
+                "business_success": args.flow_slo_business_success,
+                "p95_ms": args.flow_slo_p95_ms,
+                "p99_ms": args.flow_slo_p99_ms,
+            }
         }
         self.operation_pool = (
             ["list_contracts"] * max(1, args.contracts_weight)
@@ -239,6 +375,7 @@ class Runner:
     def setup(self) -> None:
         suffix = int(time.time() * 1000)
         today = date.today()
+
         payload_contrato = {
             "numero": f"CTR-PERF-{suffix}",
             "nomeContratante": "Cliente Performance",
@@ -343,19 +480,27 @@ class Runner:
         for item in self.results:
             per_operation[item.operation].append(item)
 
-        operations = {}
+        operations: dict[str, dict[str, Any]] = {}
         for operation, items in per_operation.items():
             op_durations = [item.duration_ms for item in items]
             op_errors = sum(1 for item in items if not item.ok)
+            op_technical_successes = sum(1 for item in items if item.ok)
+            op_business_successes = sum(1 for item in items if item.business_ok)
             statuses: dict[str, int] = defaultdict(int)
             for item in items:
                 statuses[str(item.status)] += 1
+
             operations[operation] = {
                 "requests": len(items),
                 "errors": op_errors,
+                "technical_successes": op_technical_successes,
+                "business_successes": op_business_successes,
+                "availability": op_technical_successes / len(items) if items else 0.0,
+                "business_success": op_business_successes / len(items) if items else 0.0,
                 "p50_ms": percentile(op_durations, 0.50),
                 "p95_ms": percentile(op_durations, 0.95),
                 "p99_ms": percentile(op_durations, 0.99),
+                "throughput_rps": len(items) / self.duration_seconds if self.duration_seconds else 0.0,
                 "statuses": dict(sorted(statuses.items(), key=lambda pair: pair[0])),
             }
 
@@ -365,6 +510,63 @@ class Runner:
         global_p95 = percentile(durations, 0.95)
         global_p99 = percentile(durations, 0.99)
         throughput = total_requests / self.duration_seconds if self.duration_seconds else 0.0
+
+        services: dict[str, dict[str, Any]] = {}
+        for service_name, operation_name in SERVICE_OPERATION_MAP.items():
+            operation_data = operations.get(operation_name, {})
+            targets = self.service_slos[service_name]
+            availability_value = float(operation_data.get("availability", 0.0))
+            business_success_value = float(operation_data.get("business_success", 0.0))
+            p95_value = float(operation_data.get("p95_ms", 0.0))
+            p99_value = float(operation_data.get("p99_ms", 0.0))
+            services[service_name] = {
+                "operation": operation_name,
+                "sli": {
+                    "availability": availability_value,
+                    "business_success": business_success_value,
+                },
+                "percentiles": {
+                    "p50_ms": float(operation_data.get("p50_ms", 0.0)),
+                    "p95_ms": p95_value,
+                    "p99_ms": p99_value,
+                },
+                "throughput_rps": float(operation_data.get("throughput_rps", 0.0)),
+                "targets": targets,
+                "evaluation": {
+                    "availability": evaluate_availability(availability_value, targets["availability"]),
+                    "p95": evaluate_latency(p95_value, targets["p95_ms"]),
+                    "p99": evaluate_latency(p99_value, targets["p99_ms"]),
+                },
+            }
+
+        flows: dict[str, dict[str, Any]] = {}
+        for flow_name, operation_name in FLOW_OPERATION_MAP.items():
+            operation_data = operations.get(operation_name, {})
+            targets = self.flow_slos[flow_name]
+            availability_value = float(operation_data.get("availability", 0.0))
+            business_success_value = float(operation_data.get("business_success", 0.0))
+            p95_value = float(operation_data.get("p95_ms", 0.0))
+            p99_value = float(operation_data.get("p99_ms", 0.0))
+            flows[flow_name] = {
+                "operation": operation_name,
+                "sli": {
+                    "availability": availability_value,
+                    "business_success": business_success_value,
+                },
+                "percentiles": {
+                    "p50_ms": float(operation_data.get("p50_ms", 0.0)),
+                    "p95_ms": p95_value,
+                    "p99_ms": p99_value,
+                },
+                "throughput_rps": float(operation_data.get("throughput_rps", 0.0)),
+                "targets": targets,
+                "evaluation": {
+                    "availability": evaluate_availability(availability_value, targets["availability"]),
+                    "business_success": evaluate_availability(business_success_value, targets["business_success"]),
+                    "p95": evaluate_latency(p95_value, targets["p95_ms"]),
+                    "p99": evaluate_latency(p99_value, targets["p99_ms"]),
+                },
+            }
 
         summary = {
             "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
@@ -381,9 +583,17 @@ class Runner:
             "business_successes": business_successes,
             "errors": error_count,
             "throughput_rps": throughput,
-            "sli": {
-                "availability": availability,
-                "business_success": business_success,
+            "application": {
+                "sli": {
+                    "availability": availability,
+                    "business_success": business_success,
+                },
+                "targets": self.sla,
+                "evaluation": {
+                    "availability": evaluate_availability(availability, self.sla["availability"]),
+                    "p95": evaluate_latency(global_p95, self.sla["p95_ms"]),
+                    "p99": evaluate_latency(global_p99, self.sla["p99_ms"]),
+                },
             },
             "global_percentiles": {
                 "p50_ms": global_p50,
@@ -391,21 +601,23 @@ class Runner:
                 "p99_ms": global_p99,
             },
             "targets": {
-                "slo": self.slo,
+                "global_slo": self.global_slo,
                 "sla": self.sla,
             },
             "evaluations": {
-                "slo": {
-                    "availability": "OK" if availability >= self.slo["availability"] else "FAIL",
-                    "p95": "OK" if global_p95 <= self.slo["p95_ms"] else "FAIL",
-                    "p99": "OK" if global_p99 <= self.slo["p99_ms"] else "FAIL",
+                "global_slo": {
+                    "availability": evaluate_availability(availability, self.global_slo["availability"]),
+                    "p95": evaluate_latency(global_p95, self.global_slo["p95_ms"]),
+                    "p99": evaluate_latency(global_p99, self.global_slo["p99_ms"]),
                 },
                 "sla": {
-                    "availability": "OK" if availability >= self.sla["availability"] else "FAIL",
-                    "p95": "OK" if global_p95 <= self.sla["p95_ms"] else "FAIL",
-                    "p99": "OK" if global_p99 <= self.sla["p99_ms"] else "FAIL",
+                    "availability": evaluate_availability(availability, self.sla["availability"]),
+                    "p95": evaluate_latency(global_p95, self.sla["p95_ms"]),
+                    "p99": evaluate_latency(global_p99, self.sla["p99_ms"]),
                 },
             },
+            "services": services,
+            "flows": flows,
             "operations": operations,
             "failures": [
                 {
@@ -443,19 +655,91 @@ class Runner:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Executa carga leve/ média nas rotas do sistema e calcula percentis, SLI, SLO e SLA."
+        description="Executa carga nas rotas do sistema e calcula SLI, SLO e SLA por serviço, fluxo e aplicação."
     )
     parser.add_argument("--base-url", default=os.getenv("BASE_URL", "http://localhost:8080"))
     parser.add_argument("--duration", type=int, default=env_int("DURATION_SECONDS", 60))
     parser.add_argument("--workers", type=int, default=env_int("WORKERS", 12))
     parser.add_argument("--timeout", type=float, default=env_float("TIMEOUT_SECONDS", 10.0))
     parser.add_argument("--output-dir", default=os.getenv("OUTPUT_DIR", str(DEFAULT_OUTPUT_DIR)))
+
     parser.add_argument("--slo-availability", type=float, default=env_float("SLO_AVAILABILITY", 0.99))
     parser.add_argument("--slo-p95-ms", type=float, default=env_float("SLO_P95_MS", 500.0))
     parser.add_argument("--slo-p99-ms", type=float, default=env_float("SLO_P99_MS", 1000.0))
+
     parser.add_argument("--sla-availability", type=float, default=env_float("SLA_AVAILABILITY", 0.95))
     parser.add_argument("--sla-p95-ms", type=float, default=env_float("SLA_P95_MS", 800.0))
     parser.add_argument("--sla-p99-ms", type=float, default=env_float("SLA_P99_MS", 1500.0))
+
+    parser.add_argument(
+        "--contracts-slo-availability",
+        type=float,
+        default=env_float("CONTRACTS_SLO_AVAILABILITY", DEFAULT_SERVICE_SLOS["contratos-service"]["availability"]),
+    )
+    parser.add_argument(
+        "--contracts-slo-p95-ms",
+        type=float,
+        default=env_float("CONTRACTS_SLO_P95_MS", DEFAULT_SERVICE_SLOS["contratos-service"]["p95_ms"]),
+    )
+    parser.add_argument(
+        "--contracts-slo-p99-ms",
+        type=float,
+        default=env_float("CONTRACTS_SLO_P99_MS", DEFAULT_SERVICE_SLOS["contratos-service"]["p99_ms"]),
+    )
+
+    parser.add_argument(
+        "--inventory-slo-availability",
+        type=float,
+        default=env_float("INVENTORY_SLO_AVAILABILITY", DEFAULT_SERVICE_SLOS["compras-service"]["availability"]),
+    )
+    parser.add_argument(
+        "--inventory-slo-p95-ms",
+        type=float,
+        default=env_float("INVENTORY_SLO_P95_MS", DEFAULT_SERVICE_SLOS["compras-service"]["p95_ms"]),
+    )
+    parser.add_argument(
+        "--inventory-slo-p99-ms",
+        type=float,
+        default=env_float("INVENTORY_SLO_P99_MS", DEFAULT_SERVICE_SLOS["compras-service"]["p99_ms"]),
+    )
+
+    parser.add_argument(
+        "--sales-slo-availability",
+        type=float,
+        default=env_float("SALES_SLO_AVAILABILITY", DEFAULT_SERVICE_SLOS["vendas-service"]["availability"]),
+    )
+    parser.add_argument(
+        "--sales-slo-p95-ms",
+        type=float,
+        default=env_float("SALES_SLO_P95_MS", DEFAULT_SERVICE_SLOS["vendas-service"]["p95_ms"]),
+    )
+    parser.add_argument(
+        "--sales-slo-p99-ms",
+        type=float,
+        default=env_float("SALES_SLO_P99_MS", DEFAULT_SERVICE_SLOS["vendas-service"]["p99_ms"]),
+    )
+
+    parser.add_argument(
+        "--flow-slo-availability",
+        type=float,
+        default=env_float("FLOW_SLO_AVAILABILITY", DEFAULT_FLOW_SLOS["fluxo_venda_fim_a_fim"]["availability"]),
+    )
+    parser.add_argument(
+        "--flow-slo-business-success",
+        type=float,
+        default=env_float("FLOW_SLO_BUSINESS_SUCCESS", DEFAULT_FLOW_SLOS["fluxo_venda_fim_a_fim"]["business_success"]),
+    )
+    parser.add_argument(
+        "--flow-slo-p95-ms",
+        type=float,
+        default=env_float("FLOW_SLO_P95_MS", DEFAULT_FLOW_SLOS["fluxo_venda_fim_a_fim"]["p95_ms"]),
+    )
+    parser.add_argument(
+        "--flow-slo-p99-ms",
+        type=float,
+        default=env_float("FLOW_SLO_P99_MS", DEFAULT_FLOW_SLOS["fluxo_venda_fim_a_fim"]["p99_ms"]),
+    )
+
     parser.add_argument("--contracts-weight", type=int, default=env_int("CONTRACTS_WEIGHT", 3))
     parser.add_argument("--inventory-weight", type=int, default=env_int("INVENTORY_WEIGHT", 3))
     parser.add_argument("--sales-weight", type=int, default=env_int("SALES_WEIGHT", 6))
