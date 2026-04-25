@@ -34,3 +34,11 @@ GEMINI.md
 
 # Environment files
 .env
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+
+# Tests
+tests/performance/results/
