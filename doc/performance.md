@@ -110,7 +110,7 @@ Cada microsserviço foi associado a uma operação representativa:
 | Latência P95 | 25,98 ms |
 | Latência P99 | 35,69 ms |
 
-| SLO | Meta | Resultado | Status |
+| SLO | Resultado | SLI | Status |
 |---|---|---|---|
 | Disponibilidade técnica | >= 99,00% | 100,00% | OK |
 | Latência P95 | <= 200,00 ms | 25,98 ms | OK |
@@ -128,7 +128,7 @@ Cada microsserviço foi associado a uma operação representativa:
 | Latência P95 | 23,82 ms |
 | Latência P99 | 29,07 ms |
 
-| SLO | Meta | Resultado | Status |
+| SLO | Resultado | SLI | Status |
 |---|---|---|---|
 | Disponibilidade técnica | >= 99,00% | 100,00% | OK |
 | Latência P95 | <= 250,00 ms | 23,82 ms | OK |
@@ -146,7 +146,7 @@ Cada microsserviço foi associado a uma operação representativa:
 | Latência P95 | 70,21 ms |
 | Latência P99 | 89,15 ms |
 
-| SLO | Meta | Resultado | Status |
+| SLO | Resultado | SLI | Status |
 |---|---|---|---|
 | Disponibilidade técnica | >= 99,00% | 100,00% | OK |
 | Latência P95 | <= 500,00 ms | 70,21 ms | OK |
@@ -174,7 +174,7 @@ O fluxo ponta a ponta foi medido usando `POST /api/vendas/pedidos`, pois essa op
 | Latência P95 | 70,21 ms |
 | Latência P99 | 89,15 ms |
 
-| SLO do fluxo | Meta | Resultado | Status |
+| SLO do fluxo | Resultado | SLI | Status |
 |---|---|---|---|
 | Disponibilidade técnica | >= 99,00% | 100,00% | OK |
 | Sucesso de negócio | >= 99,00% | 100,00% | OK |
@@ -199,7 +199,7 @@ O SLA foi definido para a aplicação como um todo, usando os indicadores globai
 
 ### 6.2 SLA da aplicação
 
-| SLA da aplicação | Meta | Resultado | Status |
+| SLA da aplicação | Resultado | SLI | Status |
 |---|---|---|---|
 | Disponibilidade técnica global | >= 95,00% | 100,00% | OK |
 | Latência P95 global | <= 800,00 ms | 61,97 ms | OK |
