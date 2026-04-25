@@ -116,6 +116,7 @@ services:
     environment:
       EUREKA_URL: http://eureka-server:8761/eureka/
       JAEGER_URL: http://jaeger:4318/v1/traces
+      CONTRATOS_SERVICE_URL: http://contratos-service:8082
       DB_URL: jdbc:postgresql://postgres:5432/vendas_db
       DB_USER: postgres
       DB_PASS: postgres
