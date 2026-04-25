@@ -3,8 +3,11 @@ package com.empresa.vendas.service;
 import com.empresa.vendas.client.ContratosClient;
 import com.empresa.vendas.client.dto.ContratoDTO;
 import com.empresa.vendas.client.dto.ContratoStatusResponseDTO;
+import com.empresa.vendas.domain.Item;
 import com.empresa.vendas.domain.Pedido;
+import com.empresa.vendas.dtos.input.ItemInputDTO;
 import com.empresa.vendas.dtos.input.PedidoInputDTO;
+import com.empresa.vendas.dtos.output.ItemOutputDTO;
 import com.empresa.vendas.dtos.output.PedidoOutputDTO;
 import com.empresa.vendas.enums.StatusPedidoVenda;
 import com.empresa.vendas.repository.PedidoRepository;
@@ -13,9 +16,11 @@ import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,41 +36,26 @@ public class VendasService {
     private final PedidoRepository pedidoRepository;
     private final ContratosClient contratosClient;
 
+    @Transactional(readOnly = true)
     public List<PedidoOutputDTO> listarTodos() {
         List<Pedido> list = pedidoRepository.findAll();
-        return list.stream().map(pedido -> new PedidoOutputDTO(
-                pedido.getId(),
-                pedido.getNomeCliente(),
-                pedido.getValorTotal(),
-                pedido.getDataPedido(),
-                pedido.getContratoId(),
-                null, // Mapear itens se necessário
-                pedido.getDataCriacao(),
-                pedido.getDataAtualizacao()
-        )).toList();
+        return list.stream().map(this::toOutputDTO).toList();
     }
 
+    @Transactional(readOnly = true)
     public PedidoOutputDTO buscarPorId(UUID id) {
         var pedido = findById(id);
-        return new PedidoOutputDTO(
-                pedido.getId(),
-                pedido.getNomeCliente(),
-                pedido.getValorTotal(),
-                pedido.getDataPedido(),
-                pedido.getContratoId(),
-                null, // Mapear itens se necessário
-                pedido.getDataCriacao(),
-                pedido.getDataAtualizacao()
-        );
+        return toOutputDTO(pedido);
     }
 
+    @Transactional(readOnly = true)
     public Pedido findById(UUID id) {
         return pedidoRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Pedido de venda não encontrado: " + id));
     }
 
+    @Transactional
     public PedidoOutputDTO criarPedido(PedidoInputDTO pedidoInputDTO) {
-
         ContratoStatusResponseDTO contratoStatusResponseDTO = contratosClient.validarContrato(pedidoInputDTO.contratoId());
         if (nonNull(contratoStatusResponseDTO) && !contratoStatusResponseDTO.valido())
             throw new RuntimeException("Contrato inválido ou inativo: " + pedidoInputDTO.contratoId());
@@ -73,46 +63,34 @@ public class VendasService {
         if (isNull(contratoStatusResponseDTO))
             throw new RuntimeException("Não foi possível validar o contrato: " + pedidoInputDTO.contratoId());
 
-        BigDecimal total = pedidoInputDTO.itens().stream()
+        List<ItemInputDTO> itensInput = nonNull(pedidoInputDTO.itens()) ? pedidoInputDTO.itens() : Collections.emptyList();
+        if (itensInput.isEmpty()) {
+            throw new RuntimeException("O pedido deve possuir ao menos um item");
+        }
+
+        BigDecimal total = itensInput.stream()
                 .map(item -> item.precoUnitario().multiply(BigDecimal.valueOf(item.quantidade())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         Pedido pedido = new Pedido();
         pedido.setValorTotal(total);
         pedido.setStatus(StatusPedidoVenda.PENDENTE);
-        pedido.setDataPedido(LocalDate.now());
+        pedido.setDataPedido(nonNull(pedidoInputDTO.dataPedido()) ? pedidoInputDTO.dataPedido() : LocalDate.now());
         pedido.setNomeCliente(pedidoInputDTO.nomeCliente());
         pedido.setContratoId(pedidoInputDTO.contratoId());
-        pedido = pedidoRepository.save(pedido);
+        pedido.setItens(itensInput.stream().map(item -> toEntity(item, pedido)).toList());
+        Pedido pedidoSalvo = pedidoRepository.save(pedido);
 
-        return new PedidoOutputDTO(
-                pedido.getId(),
-                pedido.getNomeCliente(),
-                pedido.getValorTotal(),
-                pedido.getDataPedido(),
-                pedido.getContratoId(),
-                null, // Mapear itens se necessário
-                pedido.getDataCriacao(),
-                pedido.getDataAtualizacao()
-        );
+        return toOutputDTO(pedidoSalvo);
     }
 
+    @Transactional
     public PedidoOutputDTO atualizarStatus(UUID id, StatusPedidoVenda novoStatus) {
         Pedido pedido = findById(id);
         pedido.setStatus(novoStatus);
-        pedido = pedidoRepository.save(pedido);
+        Pedido pedidoSalvo = pedidoRepository.save(pedido);
 
-        return new PedidoOutputDTO(
-                pedido.getId(),
-                pedido.getNomeCliente(),
-                pedido.getValorTotal(),
-                pedido.getDataPedido(),
-                pedido.getContratoId(),
-                null, // Mapear itens se necessário
-                pedido.getDataCriacao(),
-                pedido.getDataAtualizacao()
-        );
-
+        return toOutputDTO(pedidoSalvo);
     }
 
     /**
@@ -147,5 +125,40 @@ public class VendasService {
         ContratoDTO contrato = consultarContrato(contratoId);
         if ("INDISPONIVEL".equals(contrato.getStatus())) return Optional.empty();
         return Optional.of(contrato);
+    }
+
+    private PedidoOutputDTO toOutputDTO(Pedido pedido) {
+        return new PedidoOutputDTO(
+                pedido.getId(),
+                pedido.getNomeCliente(),
+                pedido.getValorTotal(),
+                pedido.getDataPedido(),
+                pedido.getContratoId(),
+                nonNull(pedido.getItens()) ? pedido.getItens().stream().map(this::toOutputDTO).toList() : List.of(),
+                pedido.getDataCriacao(),
+                pedido.getDataAtualizacao()
+        );
+    }
+
+    private ItemOutputDTO toOutputDTO(Item item) {
+        return new ItemOutputDTO(
+                item.getId(),
+                item.getInsumoId(),
+                item.getNomeInsumo(),
+                item.getQuantidade(),
+                item.getPrecoUnitario(),
+                item.getDataCriacao(),
+                item.getDataAtualizacao()
+        );
+    }
+
+    private Item toEntity(ItemInputDTO itemInputDTO, Pedido pedido) {
+        Item item = new Item();
+        item.setInsumoId(itemInputDTO.insumoId());
+        item.setNomeInsumo(itemInputDTO.nomeInsumo());
+        item.setQuantidade(itemInputDTO.quantidade());
+        item.setPrecoUnitario(itemInputDTO.precoUnitario());
+        item.setPedido(pedido);
+        return item;
     }
 }
