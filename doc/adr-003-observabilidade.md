@@ -1,8 +1,5 @@
 # ADR-003: Estratégia de Observabilidade com Rastreamento Distribuído e Correlação de Logs
 
-**Status:** Aceito
-**Data:** 2026-04-25
-
 ## Contexto
 
 Em uma arquitetura de microsserviços, uma única requisição de negócio atravessa múltiplos serviços (ex: gateway → vendas → contratos → compras). Isso torna difícil:
@@ -78,3 +75,19 @@ Implementou-se um mecanismo explícito de correlação que opera em camadas:
 - Grafana: `http://localhost:3000`
 - Jaeger UI: `http://localhost:16686`
 - Prometheus: `http://localhost:9090`
+
+## Histórico de Revisões
+
+| Campo | Valor |
+|---|---|
+| Sistema | Sistema de Gestão Comercial — Microsserviços |
+| Autores | Edval Júnior, Iago Barbosa, Mary Santos, Pedro Barros, Victor Kauan |
+| Revisores | — |
+| Supersede | — |
+| Supersedido por | — |
+
+| Versão | Data | Autor | Alteração |
+|---|---|---|---|
+| 1.0 | 2026-04-25 | Equipe | Criação inicial |
+
+**Status atual:** Aceito

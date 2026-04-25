@@ -1,9 +1,5 @@
 # ADR-001: Escolha dos Bancos de Dados por Serviço
 
-**Status:** Aceito (revisado após Peer Review em 2026-04-25)
-**Data:** 2026-04-12
-**Revisão:** 2026-04-25
-
 ## Contexto
 
 O sistema é composto por três microsserviços de negócio com domínios distintos:
@@ -48,3 +44,20 @@ Em ambiente de desenvolvimento, os três bancos rodam na mesma instância Postgr
 - Consultas que atravessam domínios (ex: relatório consolidado) requerem agregação no nível da aplicação
 - Sem transações distribuídas (necessário padrão Saga para operações cross-service)
 - Perde-se a demonstração prática de poliglotismo de persistência em ambiente de desenvolvimento
+
+## Histórico de Revisões
+
+| Campo | Valor |
+|---|---|
+| Sistema | Sistema de Gestão Comercial — Microsserviços |
+| Autores | Edval Júnior, Iago Barbosa, Mary Santos, Pedro Barros, Victor Kauan |
+| Revisores | Equipe do grupo (revisão interna) |
+| Supersede | — (primeiro ADR do projeto) |
+| Supersedido por | — |
+
+| Versão | Data | Autor | Alteração |
+|---|---|---|---|
+| 1.0 | 2026-04-12 | Equipe | Criação inicial — previa MongoDB para o `vendas-service` |
+| 1.1 | 2026-04-25 | Equipe | Revisão após peer review: substituição de MongoDB por PostgreSQL no `vendas-service`; adicionada seção de alternativas consideradas |
+
+**Status atual:** Aceito

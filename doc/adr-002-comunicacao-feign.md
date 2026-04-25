@@ -1,9 +1,5 @@
 # ADR-002: Comunicação entre Serviços via OpenFeign com Resilience4j
 
-**Status:** Aceito (revisado em 2026-04-25)
-**Data:** 2026-04-12
-**Revisão:** 2026-04-25
-
 ## Contexto
 
 O `vendas-service` precisa consultar dados do `contratos-service` para validar contratos vinculados a pedidos de venda, e do `compras-service` para verificar e baixar estoque. Foi necessário definir:
@@ -72,3 +68,20 @@ Após análise, o Rate Limiter foi **removido do endpoint de criação de pedido
 **Negativo:**
 - Comunicação síncrona mantém acoplamento temporal: lentidão no `contratos-service` impacta o tempo de resposta do `vendas-service` mesmo com retry
 - Para operações críticas de negócio, comunicação assíncrona via mensageria seria mais adequada (fora do escopo deste projeto)
+
+## Histórico de Revisões
+
+| Campo | Valor |
+|---|---|
+| Sistema | Sistema de Gestão Comercial — Microsserviços |
+| Autores | Edval Júnior, Iago Barbosa, Mary Santos, Pedro Barros, Victor Kauan |
+| Revisores | Equipe do grupo (revisão após testes de performance) |
+| Supersede | — |
+| Supersedido por | — |
+
+| Versão | Data | Autor | Alteração |
+|---|---|---|---|
+| 1.0 | 2026-04-12 | Equipe | Criação inicial — incluía Rate Limiter de 10 req/s no endpoint `POST /api/vendas/pedidos` |
+| 1.1 | 2026-04-25 | Equipe | Revisão após peer review: remoção do Rate Limiter do endpoint; adicionada seção de alternativas e documentação do impacto nos testes de performance |
+
+**Status atual:** Aceito
