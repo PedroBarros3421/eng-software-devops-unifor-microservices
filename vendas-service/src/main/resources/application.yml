@@ -62,3 +62,9 @@ management:
   health:
     circuitbreakers:
       enabled: true
+  tracing:
+    sampling:
+      probability: 1.0  # Send 100% of traces (adjust for production)
+  otlp:
+    tracing:
+      endpoint: ${JAEGER_URL:http://localhost:4318/v1/traces} # Jaeger OTLP HTTP receiver
