@@ -3,8 +3,12 @@ package com.empresa.compras.controller;
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.info.Contact;
 import io.swagger.v3.oas.annotations.info.Info;
+import io.swagger.v3.oas.annotations.servers.Server;
 
 @OpenAPIDefinition(
+        servers = {
+                @Server(url = "http://localhost:8081", description = "Compras local")
+        },
         info = @Info(
                 title = "Compras API",
                 description = "API para gerenciamento de insumos, estoque e pedidos de compra.",
