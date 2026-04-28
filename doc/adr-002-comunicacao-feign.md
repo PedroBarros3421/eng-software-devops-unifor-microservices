@@ -1,11 +1,10 @@
-# ADR-002: Comunicação entre Serviços via OpenFeign com Resilience4j
+# ADR-002: Comunicação entre Serviços
 
 ## Contexto
 
 O `vendas-service` precisa consultar dados do `contratos-service` para validar contratos vinculados a pedidos de venda e do `compras-service` para verificar e baixar estoque. Foi necessário definir:
 
 1. O protocolo de comunicação entre microsserviços
-2. A estratégia de resiliência para lidar com falhas temporárias ou indisponibilidade
 
 ## Alternativas Consideradas
 
@@ -18,38 +17,12 @@ O `vendas-service` precisa consultar dados do `contratos-service` para validar c
 
 ## Decisão
 
-Adotar **OpenFeign** para comunicação síncrona HTTP, integrado ao **Eureka** para resolução de endereços, e **Resilience4j** para resiliência em camadas:
+Adotar **OpenFeign** para comunicação síncrona HTTP, integrado ao **Eureka** para resolução de endereços:
 
 ### Comunicação: OpenFeign + Eureka
 
 - O `ContratosClient` usa `@FeignClient(name = "contratos-service")` e o `ComprasClient` usa `@FeignClient(name = "compras-service")`, com nomes resolvidos via Eureka (sem URLs hardcoded)
 - O Spring Cloud LoadBalancer distribui a carga caso existam múltiplas instâncias
-
-### Resiliência em camadas (vendas-service → contratos-service)
-
-| Padrão | Configuração | Comportamento |
-|---|---|---|
-| **Retry** | 3 tentativas, backoff exponencial (500ms × 2) | Reenvio automático em falhas transitórias de rede |
-| **Circuit Breaker** | 50% de falhas em janela de 10 chamadas abre o disjuntor por 10s | Interrompe chamadas a serviços instáveis, evitando cascata de falhas |
-| **Fallback** | Retorna `ContratoDTO` com `status = "INDISPONIVEL"` | Resposta degradada mas funcional quando o serviço está fora do ar |
-
-### Fluxo de chamada com resiliência
-
-```
-VendasController → VendasService
-                        │
-                   consultarContrato()
-                   @Retry (3x com backoff exponencial)
-                   @CircuitBreaker (CLOSED → OPEN → HALF-OPEN)
-                   ContratosClient (Feign + Eureka)
-                        │
-                   contratos-service /api/contratos/{id}
-                        │
-                   verificarEstoque() / baixarEstoque()
-                   ComprasClient (Feign + Eureka)
-                        │
-                   compras-service /api/compras/insumos
-```
 
 ## Nota de revisão (2026-04-25)
 
@@ -63,7 +36,6 @@ Após análise, o Rate Limiter foi **removido do endpoint de criação de pedido
 - Código declarativo: os clients Feign parecem interfaces locais, sem boilerplate HTTP
 - O Eureka elimina o acoplamento por endereço IP ou URL fixa
 - Circuit Breaker e Retry garantem robustez sem afetar a experiência do usuário final (via fallback)
-- Resiliência observável via endpoint `/actuator/circuitbreakers` e `/actuator/retries`
 
 **Negativo:**
 - Comunicação síncrona mantém acoplamento temporal: lentidão no `contratos-service` impacta o tempo de resposta do `vendas-service` mesmo com retry
