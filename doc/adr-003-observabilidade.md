@@ -1,93 +1,76 @@
-# ADR-003: Estratégia de Observabilidade com Rastreamento Distribuído e Correlação de Logs
+# ADR-003: Estratégia de Observabilidade para Microsserviços
 
 ## Contexto
 
-Em uma arquitetura de microsserviços, uma única requisição de negócio atravessa múltiplos serviços (ex: gateway → vendas → contratos → compras). Isso torna difícil:
+Em uma arquitetura de microsserviços, uma única operação de negócio atravessa múltiplos serviços e pontos de integração. Isso dificulta responder, com rapidez e evidência, perguntas como:
 
-1. Correlacionar logs de diferentes serviços que pertencem à mesma requisição
-2. Identificar gargalos de latência em chamadas entre serviços
-3. Detectar falhas em cascata e suas origens
-4. Monitorar métricas de disponibilidade e SLO em tempo real
+1. Onde uma requisição falhou e em qual serviço o problema começou
+2. Qual chamada interna concentrou a maior latência
+3. Se um incidente foi isolado ou em cascata
+4. Se o sistema está atendendo metas operacionais de disponibilidade e tempo de resposta
 
-Era necessário definir uma estratégia de observabilidade que cobrisse os três pilares: **logs**, **métricas** e **traces**.
+Era necessário adotar uma estratégia de observabilidade que cobrisse os três pilares do domínio operacional: logs, métricas e rastreamento distribuído.
+
+Além do aspecto técnico, a decisão precisava considerar o contexto do projeto: ambiente acadêmico, orçamento restrito, operação simplificada e necessidade de aprendizado com ferramentas amplamente adotadas no ecossistema cloud-native.
 
 ## Alternativas Consideradas
 
-| Alternativa | Prós | Contras |
-|---|---|---|
-| Apenas logs estruturados | Simplicidade | Sem correlação automática, sem rastreamento de latência end-to-end |
-| ELK Stack (Elasticsearch + Logstash + Kibana) | Maturidade, poder de busca | Alto consumo de recursos, complexidade operacional |
-| **Stack Grafana (Loki + Tempo + Prometheus + Grafana)** | Integração nativa, leve, logs sem índice, custo menor | Menos recursos de busca full-text que Elasticsearch |
-| Datadog / New Relic (SaaS) | Observabilidade completa com mínima operação | Custo, dependência de fornecedor, não adequado para ambiente acadêmico |
-| OpenTelemetry + Jaeger | Padrão aberto, vendor-neutral para traces | Requer complemento para logs e métricas |
+| Alternativa                                        | Prós                                                                                                     | Contras                                                                              |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Apenas logs estruturados                           | Menor esforço inicial e baixa complexidade                                                               | Não oferece visão end-to-end nem facilita análise de latência entre serviços         |
+| ELK Stack                                          | Ecossistema maduro e forte capacidade de busca                                                           | Maior custo operacional e consumo de recursos para o porte atual do projeto          |
+| Soluções SaaS pagas                                | Menor esforço de operação e experiência integrada                                                        | Custo recorrente, dependência de fornecedor e menor aderência ao contexto acadêmico  |
+| Ferramentas isoladas para cada pilar               | Flexibilidade de composição                                                                              | Aumenta integração, manutenção e fragmentação da análise operacional                 |
+| Stack open-source integrada do ecossistema Grafana | Boa cobertura dos três pilares, baixo custo de adoção e integração natural com ambientes containerizados | Exige operação própria e pode oferecer menos conveniência que plataformas comerciais |
 
 ## Decisão
 
-Adotar a **stack Grafana + Jaeger** com OpenTelemetry como camada de instrumentação:
+Adotar uma stack open-source integrada de observabilidade, centrada no ecossistema Grafana e em padrões abertos de instrumentação e correlação.
 
-### Componentes
+Essa escolha foi feita por três razões principais:
 
-| Componente | Função |
-|---|---|
-| **Prometheus** | Coleta e armazenamento de métricas (scrape via `/actuator/prometheus`) |
-| **Loki** | Agregação e armazenamento de logs estruturados |
-| **Promtail** | Agente de coleta de logs dos containers Docker |
-| **Jaeger** | Rastreamento distribuído (traces e spans via OTLP) |
-| **Grafana** | Visualização unificada: dashboards de métricas, exploração de logs e traces |
+1. **Custo**: elimina dependência imediata de licenças e custos recorrentes, o que é mais adequado ao orçamento do projeto.
+2. **Simplicidade operacional relativa**: embora exista operação própria, a stack escolhida é suficientemente difundida, bem documentada e compatível com o nível de complexidade esperado para este ambiente.
+3. **Flexibilidade futura**: ao usar padrões abertos para métricas, logs e traces, a equipe preserva a possibilidade de migrar para outra plataforma no futuro sem alterar a lógica de negócio dos serviços.
 
-### Correlação de Requisições: X-Correlation-ID
-
-Implementou-se um mecanismo explícito de correlação que opera em camadas:
-
-1. **API Gateway**: gera um `X-Correlation-ID` (UUID v4) se o header não estiver presente na requisição entrada; preserva o valor se já vier do cliente
-2. **Propagação**: todos os serviços downstream (vendas, contratos, compras) leem o header e armazenam o valor no MDC (Mapped Diagnostic Context) do SLF4J
-3. **Logs**: cada linha de log inclui `correlationId`, `traceId` e `spanId`
-4. **Headers de resposta**: o `X-Correlation-ID` é retornado nas respostas para rastreabilidade pelo cliente
-
-### Padrão de log estruturado
-
-```
-[vendas-service,<correlationId>,<traceId>,<spanId>] INFO  ...mensagem...
-```
-
-### Rastreamento distribuído com OpenTelemetry
-
-- `spring-boot-starter-actuator` + `micrometer-tracing-bridge-otel` + `opentelemetry-exporter-otlp`
-- Probabilidade de amostragem: 100% (`probability: 1.0`) em desenvolvimento
-- Traces enviados ao Jaeger via OTLP HTTP (`/v1/traces`)
+A decisão arquitetural, portanto, não é sobre portas, dashboards ou endpoints específicos, mas sobre priorizar uma solução com boa relação entre cobertura funcional, custo e independência tecnológica.
 
 ## Consequências
 
 **Positivo:**
-- Diagnóstico completo de uma requisição end-to-end: um único `correlationId` ou `traceId` identifica todos os logs e spans relacionados
-- Stack inteiramente open-source, executável em Docker Compose sem dependência de serviços externos
-- Grafana unifica métricas, logs e traces em uma interface, com navegação entre pilares (ex: de um pico de latência no Prometheus direto para o trace no Jaeger)
-- Métricas Prometheus expõem automaticamente JVM, conexões de banco, Feign, Resilience4j e métricas de negócio via Actuator
+
+- Permite observar requisições distribuídas de forma mais consistente, reduzindo o tempo de diagnóstico em incidentes
+- Mantém a solução aderente ao contexto financeiro e acadêmico do projeto
+- Reduz risco de aprisionamento em fornecedor ao adotar padrões e ferramentas amplamente reconhecidos no mercado
+- Cria uma base evolutiva: a equipe pode sofisticar a operação de observabilidade sem reescrever a lógica dos microsserviços
 
 **Negativo:**
-- Promtail coleta logs em texto dos containers e os repassa ao Loki; para logs estruturados (JSON) seria necessário configuração adicional de parsing
-- Amostragem a 100% em produção geraria volume alto de dados; recomenda-se reduzir para 10–20% em ambientes de alta carga
-- A correlação entre `X-Correlation-ID` e `traceId` do Jaeger é feita via log, mas não são o mesmo identificador — exige busca cruzada
 
-## Referências
+- A equipe assume responsabilidade pela operação e manutenção da stack escolhida
+- Pode haver menor conveniência inicial quando comparado a plataformas SaaS especializadas
+- A maturidade operacional necessária para extrair valor da observabilidade continua sendo responsabilidade do time, independentemente da ferramenta adotada
 
-- Spring Boot Actuator: `/actuator/health`, `/actuator/prometheus`, `/actuator/circuitbreakers`
-- Grafana: `http://localhost:3000`
-- Jaeger UI: `http://localhost:16686`
-- Prometheus: `http://localhost:9090`
+## Consequências para o Futuro
+
+Esta decisão não impede migração futura para uma solução comercial ou gerenciada. Pelo contrário: ela registra que a escolha atual foi orientada por custo, simplicidade e adequação ao contexto, e não por uma dependência arquitetural irreversível.
+
+Se o projeto evoluir para um cenário com maior orçamento, requisitos regulatórios mais rígidos ou necessidade de operação gerenciada, a equipe poderá reavaliar a plataforma de observabilidade sem alterar contratos de serviço ou regras de negócio centrais.
 
 ## Histórico de Revisões
 
-| Campo | Valor |
-|---|---|
-| Sistema | Sistema de Gestão Comercial — Microsserviços |
-| Autores | Edval Júnior, Iago Barbosa, Mary Santos, Pedro Barros, Victor Kauan |
-| Revisores | — |
-| Supersede | — |
-| Supersedido por | — |
+| Campo           | Valor                                                               |
+| --------------- | ------------------------------------------------------------------- |
+| Sistema         | Sistema de Gestão Comercial — Microsserviços                        |
+| Autores         | Edval Júnior, Iago Barbosa, Mary Santos, Pedro Barros, Victor Kauan |
+| Revisores       | —                                                                   |
+| Supersede       | —                                                                   |
+| Supersedido por | —                                                                   |
 
-| Versão | Data | Autor | Alteração |
-|---|---|---|---|
-| 1.0 | 2026-04-25 | Equipe | Criação inicial |
+| Versão  | Data       | Autor  | Alteração                                                                                                                 |
+| ------- | ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------- |
+| 1.0     | 2026-04-25 | Equipe | Criação inicial                                                                                                           |
+| 1.1 --- | ---        | ---    |
+| 1.0     | 2026-04-25 | Equipe | Criação inicial                                                                                                           |
+| 1.1     | 2026-04-25 | Equipe | Revisão após peer review: remoção de detalhes de implementação e reforço da justificativa técnica e financeira da decisão |
 
 **Status atual:** Aceito
