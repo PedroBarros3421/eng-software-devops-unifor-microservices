@@ -11,7 +11,7 @@ O `vendas-service` precisa consultar dados do `contratos-service` para validar c
 | Alternativa | Prós | Contras |
 |---|---|---|
 | RestTemplate manual | Sem dependência adicional | Boilerplate HTTP, sem integração nativa com Eureka/LoadBalancer |
-| OpenFeign (escolhido) | Declarativo, integração nativa com Eureka e Resilience4j, código limpo | Comunicação síncrona mantém acoplamento temporal |
+| OpenFeign (escolhido) | Declarativo, integração nativa com Eureka e Spring Cloud LoadBalancer, código limpo | Comunicação síncrona mantém acoplamento temporal |
 | Mensageria assíncrona (Kafka/RabbitMQ) | Desacoplamento temporal, tolerância a falhas | Complexidade de implementação fora do escopo do projeto |
 | gRPC | Alta performance, contrato forte | Curva de aprendizado, incompatível com infraestrutura HTTP atual |
 
@@ -28,17 +28,16 @@ Adotar **OpenFeign** para comunicação síncrona HTTP, integrado ao **Eureka** 
 
 A versão anterior desta ADR documentava um **Rate Limiter de 10 req/s** no endpoint `POST /api/vendas/pedidos`. Durante os testes de performance, identificou-se que esse limite causava rejeições artificiais (HTTP 429/500) com apenas 8 workers concorrentes, distorcendo as métricas de disponibilidade.
 
-Após análise, o Rate Limiter foi **removido do endpoint de criação de pedidos**. O controle de sobrecarga permanece via Circuit Breaker nas chamadas downstream e via recursos do API Gateway. O Rate Limiter poderá ser reintroduzido em camada de borda (gateway) com limites mais adequados ao perfil de carga real, caso necessário.
+Após análise, o Rate Limiter foi **removido do endpoint de criação de pedidos**. O Rate Limiter poderá ser reintroduzido em camada de borda (gateway) com limites mais adequados ao perfil de carga real, caso necessário.
 
 ## Consequências
 
 **Positivo:**
 - Código declarativo: os clients Feign parecem interfaces locais, sem boilerplate HTTP
 - O Eureka elimina o acoplamento por endereço IP ou URL fixa
-- Circuit Breaker e Retry garantem robustez sem afetar a experiência do usuário final (via fallback)
 
 **Negativo:**
-- Comunicação síncrona mantém acoplamento temporal: lentidão no `contratos-service` impacta o tempo de resposta do `vendas-service` mesmo com retry
+- Comunicação síncrona mantém acoplamento temporal: lentidão no `contratos-service` impacta o tempo de resposta do `vendas-service`
 - Para operações críticas de negócio, comunicação assíncrona via mensageria seria mais adequada (fora do escopo deste projeto)
 
 ## Histórico de Revisões
@@ -55,5 +54,6 @@ Após análise, o Rate Limiter foi **removido do endpoint de criação de pedido
 |---|---|---|---|
 | 1.0 | 2026-04-12 | Equipe | Criação inicial — incluía Rate Limiter de 10 req/s no endpoint `POST /api/vendas/pedidos` |
 | 1.1 | 2026-04-25 | Equipe | Revisão após peer review: remoção do Rate Limiter do endpoint; adicionada seção de alternativas e documentação do impacto nos testes de performance |
+| 1.2 | 2026-05-02 | Equipe | Revisão conforme feedback do professor: remoção de referências a mecanismos de resiliência (escopo de ADR separado) |
 
 **Status atual:** Aceito
