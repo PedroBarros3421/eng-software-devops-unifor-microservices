@@ -234,16 +234,3 @@ Os testes devem ser executados apenas após:
 
 Sem esse aquecimento, podem ocorrer falhas transitórias de discovery ou ausência temporária de métricas, o que não representa o comportamento estável do sistema.
 
-## 9. Evidências geradas
-
-Os artefatos gerados automaticamente pelo runner estão em:
-
-- [`tests/performance/results/summary.json`](../tests/performance/results/summary.json)
-- [`tests/performance/results/summary.md`](../tests/performance/results/summary.md)
-
-Esses arquivos consolidam:
-
-- métricas brutas da execução;
-- SLIs por microsserviço;
-- SLI e SLO do fluxo principal;
-- SLIs e SLA da aplicação.

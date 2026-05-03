@@ -343,10 +343,6 @@ Antes de rodar o teste, confirme que todos os containers estão `healthy` e que 
 make perf
 ```
 
-Arquivos gerados:
-
-- [tests/performance/results/summary.json](tests/performance/results/summary.json)
-- [tests/performance/results/summary.md](tests/performance/results/summary.md)
 
 ## 14. Artefatos da disciplina
 
