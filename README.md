@@ -200,6 +200,8 @@ Verificar o estado:
 docker compose ps
 ```
 
+Aguarde até todos os containers aparecerem como `healthy`. Em seguida, confirme no Eureka (http://localhost:8761) que `compras-service`, `contratos-service` e `vendas-service` estão com status `UP` antes de enviar requisições ou rodar testes de performance.
+
 Serviços principais:
 
 | Serviço | URL |
@@ -328,6 +330,14 @@ make test
 ```
 
 ### Performance
+
+Na primeira execução, instale as dependências Python:
+
+```bash
+make perf-setup
+```
+
+Antes de rodar o teste, confirme que todos os containers estão `healthy` e que os três serviços de negócio aparecem com status `UP` no Eureka (http://localhost:8761). Rodar o teste antes da propagação do Eureka causa falhas transitórias de discovery que não refletem o comportamento estável do sistema.
 
 ```bash
 make perf
