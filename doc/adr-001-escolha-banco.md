@@ -1,64 +1,68 @@
-# ADR-001: Escolha dos Bancos de Dados por Serviço
+# ADR-001: Estratégia de Persistência por Microsserviço
 
 ## Contexto
 
-O sistema é composto por três microsserviços de negócio com domínios distintos:
+O sistema é composto por três serviços de negócio com domínios distintos e requisitos de dados específicos:
 
-- **compras-service**: gerencia insumos e pedidos a fornecedores (dados altamente relacionais com integridade transacional)
-- **contratos-service**: gerencia contratos com vigência, termos e status (dados estruturados com esquema fixo)
-- **vendas-service**: processa pedidos de clientes com itens, quantidades e valores — necessita de integridade transacional para garantir consistência entre baixa de estoque e registro da venda
+- **compras-service**: dados altamente relacionais com integridade transacional entre insumos e pedidos a fornecedores
+- **contratos-service**: dados estruturados com esquema fixo, consultados por vigência e status
+- **vendas-service**: processa pedidos de clientes com itens e valores - o fluxo de venda exige consistência entre a baixa de estoque e o registro do pedido
 
-O padrão **Database per Service** exige que cada serviço tenha sua própria base de dados para garantir independência de deploy e evitar acoplamento forte.
+Era necessário decidir duas coisas: (1) como organizar a posse dos dados entre os serviços e (2) qual tecnologia de banco adotar para o `vendas-service`, que foi o serviço com maior discussão sobre modelo de dados.
 
 ## Alternativas Consideradas
 
-| Alternativa                       | Prós                                                                               | Contras                                                                         |
-| --------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| MongoDB para vendas-service       | Flexibilidade de esquema para itens de pedido                                      | Dificulta integridade referencial com contratos e insumos, curva de aprendizado |
-| PostgreSQL para todos (escolhido) | Garantia ACID para fluxo de venda que envolve baixa de estoque, operação unificada | Ligeiramente menos flexível para dados semi-estruturados                        |
+### Estratégia de organização dos dados
+
+| Alternativa | Prós | Contras |
+|---|---|---|
+| Banco de dados compartilhado | Consultas entre domínios diretas, operação simples | Acoplamento forte entre serviços, impossibilita deploy e evolução independentes |
+| Database per Service (escolhido) | Independência de deploy, isolamento de domínios, evolução independente por contexto | Consultas cross-domínio exigem agregação na aplicação; sem transações distribuídas nativas |
+
+### Tecnologia para o `vendas-service`
+
+| Alternativa | Prós | Contras |
+|---|---|---|
+| MongoDB | Flexibilidade de esquema para itens de pedido | O modelo de Venda é estruturado e o fluxo exige consistência transacional - a flexibilidade não traz benefício real |
+| PostgreSQL (escolhido) | Garantia ACID para o fluxo de venda que envolve múltiplas operações; adequação ao modelo relacional do domínio | Ligeiramente menos flexível para dados semi-estruturados |
 
 ## Decisão
 
-Adotar **PostgreSQL como banco único** para os três serviços de negócio, com isolamento lógico por banco de dados separado por serviço:
+Adotar o padrão **Database per Service**: cada microsserviço é dono exclusivo dos seus dados e nenhum outro serviço acessa seu banco diretamente.
 
-| Serviço           | Banco      | Database       | Justificativa                                                                                               |
-| ----------------- | ---------- | -------------- | ----------------------------------------------------------------------------------------------------------- |
-| compras-service   | PostgreSQL | `compras_db`   | Dados relacionais, integridade transacional, consultas com JOIN entre insumos e pedidos                     |
-| contratos-service | PostgreSQL | `contratos_db` | Esquema fixo e estruturado, consultas por vigência e status, auditoria                                      |
-| vendas-service    | PostgreSQL | `vendas_db`    | Integridade transacional necessária para garantir consistência entre registro da venda e dados relacionados |
+A justificativa arquitetural é que serviços com domínios distintos precisam poder evoluir, ser implantados e escalar de forma independente. Um banco compartilhado criaria acoplamento estrutural que invalida os benefícios da separação por microsserviço - qualquer mudança de schema em um serviço poderia impactar os demais.
 
-> **Nota de revisão (Peer Review 2026-04-25):** A decisão inicial previa MongoDB para o `vendas-service` como demonstração de poliglotismo. Após peer review, foi identificado que o uso de MongoDB no escopo atual traria complexidade operacional sem benefício real de flexibilidade de esquema, uma vez que o modelo de Venda é estruturado e o fluxo exige consistência transacional. A decisão foi revisada para PostgreSQL, simplificando a infraestrutura e alinhando a persistência ao padrão transacional exigido.
-
-Em ambiente de desenvolvimento, os três bancos rodam na mesma instância PostgreSQL (isolamento por database). Em produção, cada serviço teria sua própria instância.
+Para a tecnologia, **PostgreSQL** foi adotado em todos os serviços. A principal motivação veio do `vendas-service`: embora MongoDB fosse uma opção considerada para acomodar a estrutura variável de itens de pedido, o modelo de dados de Venda é suficientemente estruturado e o fluxo de negócio exige consistência transacional entre operações - características que favorecem o modelo relacional. Manter a mesma tecnologia nos três serviços também reduz complexidade operacional sem abrir mão de adequação técnica.
 
 ## Consequências
 
 **Positivo:**
 
 - Cada serviço pode evoluir seu esquema independentemente sem impactar os demais
-- Operação simplificada: um único tipo de banco a manter
-- Garantia ACID em todos os serviços, incluindo o fluxo de venda que envolve múltiplos serviços
-- Uso de Flyway para versionamento de schema em todos os serviços
+- Falhas ou mudanças em um banco não propagam para os outros serviços
+- Garantia ACID em todos os serviços, incluindo o fluxo de venda que envolve múltiplas operações
+- Redução de complexidade operacional ao manter um único tipo de banco
 
 **Negativo:**
 
 - Consultas que atravessam domínios (ex: relatório consolidado) requerem agregação no nível da aplicação
-- Sem transações distribuídas (necessário padrão Saga para operações cross-service)
-- Perde-se a demonstração prática de poliglotismo de persistência em ambiente de desenvolvimento
+- Sem transações distribuídas nativas - operações cross-service requerem padrões como Saga
+- Perde-se a demonstração prática de poliglotismo de persistência
 
 ## Histórico de Revisões
 
 | Campo           | Valor                                                               |
 | --------------- | ------------------------------------------------------------------- |
-| Sistema         | Sistema de Gestão Comercial — Microsserviços                        |
+| Sistema         | Sistema de Gestão Comercial - Microsserviços                        |
 | Autores         | Edval Júnior, Iago Barbosa, Mary Santos, Pedro Barros, Victor Kauan |
 | Revisores       | Equipe do grupo (revisão interna)                                   |
-| Supersede       | — (primeiro ADR do projeto)                                         |
-| Supersedido por | —                                                                   |
+| Supersede       | - (primeiro ADR do projeto)                                         |
+| Supersedido por | -                                                                   |
 
-| Versão | Data       | Autor  | Alteração                                                                                                                           |
-| ------ | ---------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------- |
-| 1.0    | 2026-04-12 | Equipe | Criação inicial — previa MongoDB para o `vendas-service`                                                                            |
-| 1.1    | 2026-04-25 | Equipe | Revisão após peer review: substituição de MongoDB por PostgreSQL no `vendas-service`; adicionada seção de alternativas consideradas |
+| Versão | Data       | Autor  | Alteração                                                                                                                                                    |
+| ------ | ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1.0    | 2026-04-12 | Equipe | Criação inicial - previa MongoDB para o `vendas-service`                                                                                                     |
+| 1.1    | 2026-04-25 | Equipe | Revisão após peer review: substituição de MongoDB por PostgreSQL no `vendas-service`; adicionada seção de alternativas consideradas                          |
+| 1.2    | 2026-05-02 | Equipe | Revisão conforme feedback do professor: foco deslocado para a decisão arquitetural (Database per Service); remoção de detalhes de implantação e configuração |
 
 **Status atual:** Aceito
