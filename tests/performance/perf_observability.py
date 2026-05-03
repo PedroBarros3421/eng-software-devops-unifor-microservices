@@ -667,7 +667,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--slo-p95-ms", type=float, default=env_float("SLO_P95_MS", 500.0))
     parser.add_argument("--slo-p99-ms", type=float, default=env_float("SLO_P99_MS", 1000.0))
 
-    parser.add_argument("--sla-availability", type=float, default=env_float("SLA_AVAILABILITY", 0.95))
+    parser.add_argument("--sla-availability", type=float, default=env_float("SLA_AVAILABILITY", 0.99))
     parser.add_argument("--sla-p95-ms", type=float, default=env_float("SLA_P95_MS", 800.0))
     parser.add_argument("--sla-p99-ms", type=float, default=env_float("SLA_P99_MS", 1500.0))
 

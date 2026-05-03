@@ -128,9 +128,6 @@ services:
 
   compras-service:
     build: ./compras-service
-    container_name: compras-service
-    ports:
-      - "${COMPRAS_PORT:-8081}:8081"
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/health"]
       interval: 10s
@@ -153,9 +150,6 @@ services:
 
   contratos-service:
     build: ./contratos-service
-    container_name: contratos-service
-    ports:
-      - "${CONTRATOS_PORT:-8082}:8082"
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8082/health"]
       interval: 10s
@@ -178,9 +172,6 @@ services:
 
   vendas-service:
     build: ./vendas-service
-    container_name: vendas-service
-    ports:
-      - "${VENDAS_PORT:-8083}:8083"
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8083/health"]
       interval: 10s

@@ -1,8 +1,8 @@
 # Resultados de Performance
 
-**Data da execução:** 2026-04-25  
-**Ambiente:** Docker Compose local (WSL2)  
-**Comando:** `DURATION_SECONDS=30 WORKERS=8 make perf`
+**Data da execução:** 2026-05-02  
+**Ambiente:** Docker Compose local  
+**Comando:** `make perf`
 
 ## 1. Objetivo da medição
 
@@ -102,55 +102,55 @@ Cada microsserviço foi associado a uma operação representativa:
 
 | SLI | Valor observado |
 |---|---|
-| Requests | 1.849 |
-| Throughput | 61,63 req/s |
+| Requests | 4.021 |
+| Throughput | 67,02 req/s |
 | Disponibilidade técnica | 100,00% |
 | Sucesso de negócio | 100,00% |
-| Latência P50 | 14,71 ms |
-| Latência P95 | 25,98 ms |
-| Latência P99 | 35,69 ms |
+| Latência P50 | 10,20 ms |
+| Latência P95 | 19,76 ms |
+| Latência P99 | 26,45 ms |
 
 | SLO | Meta | SLI | Status |
 |---|---|---|---|
 | Disponibilidade técnica | >= 99,00% | 100,00% | OK |
-| Latência P95 | <= 200,00 ms | 25,98 ms | OK |
-| Latência P99 | <= 400,00 ms | 35,69 ms | OK |
+| Latência P95 | <= 200,00 ms | 19,76 ms | OK |
+| Latência P99 | <= 400,00 ms | 26,45 ms | OK |
 
 ### 4.2 `compras-service`
 
 | SLI | Valor observado |
 |---|---|
-| Requests | 1.842 |
-| Throughput | 61,40 req/s |
+| Requests | 3.972 |
+| Throughput | 66,20 req/s |
 | Disponibilidade técnica | 100,00% |
 | Sucesso de negócio | 100,00% |
-| Latência P50 | 13,76 ms |
-| Latência P95 | 23,82 ms |
-| Latência P99 | 29,07 ms |
+| Latência P50 | 10,52 ms |
+| Latência P95 | 20,47 ms |
+| Latência P99 | 27,35 ms |
 
 | SLO | Meta | SLI | Status |
 |---|---|---|---|
 | Disponibilidade técnica | >= 99,00% | 100,00% | OK |
-| Latência P95 | <= 250,00 ms | 23,82 ms | OK |
-| Latência P99 | <= 500,00 ms | 29,07 ms | OK |
+| Latência P95 | <= 250,00 ms | 20,47 ms | OK |
+| Latência P99 | <= 500,00 ms | 27,35 ms | OK |
 
 ### 4.3 `vendas-service`
 
 | SLI | Valor observado |
 |---|---|
-| Requests | 3.644 |
-| Throughput | 121,47 req/s |
+| Requests | 7.911 |
+| Throughput | 131,85 req/s |
 | Disponibilidade técnica | 100,00% |
 | Sucesso de negócio | 100,00% |
-| Latência P50 | 46,10 ms |
-| Latência P95 | 70,21 ms |
-| Latência P99 | 89,15 ms |
+| Latência P50 | 78,33 ms |
+| Latência P95 | 101,17 ms |
+| Latência P99 | 116,28 ms |
 
 | SLO | Meta | SLI | Status |
 |---|---|---|---|
 | Disponibilidade técnica | >= 99,00% | 100,00% | OK |
-| Latência P95 | <= 500,00 ms | 70,21 ms | OK |
-| Latência P99 | <= 1000,00 ms | 89,15 ms | OK |
+| Latência P95 | <= 500,00 ms | 101,17 ms | OK |
+| Latência P99 | <= 1000,00 ms | 116,28 ms | OK |
 
 ## 5. SLI e SLO do fluxo principal
 
@@ -166,20 +166,20 @@ O fluxo ponta a ponta foi medido usando `POST /api/vendas/pedidos`, pois essa op
 |---|---|
 | Fluxo | `fluxo_venda_fim_a_fim` |
 | Operação medida | `POST /api/vendas/pedidos` |
-| Requests | 3.644 |
-| Throughput | 121,47 req/s |
+| Requests | 7.911 |
+| Throughput | 131,85 req/s |
 | Disponibilidade técnica | 100,00% |
 | Sucesso de negócio | 100,00% |
-| Latência P50 | 46,10 ms |
-| Latência P95 | 70,21 ms |
-| Latência P99 | 89,15 ms |
+| Latência P50 | 78,33 ms |
+| Latência P95 | 101,17 ms |
+| Latência P99 | 116,28 ms |
 
 | SLO do fluxo | Meta | SLI | Status |
 |---|---|---|---|
 | Disponibilidade técnica | >= 99,00% | 100,00% | OK |
 | Sucesso de negócio | >= 99,00% | 100,00% | OK |
-| Latência P95 | <= 500,00 ms | 70,21 ms | OK |
-| Latência P99 | <= 1000,00 ms | 89,15 ms | OK |
+| Latência P95 | <= 500,00 ms | 101,17 ms | OK |
+| Latência P99 | <= 1000,00 ms | 116,28 ms | OK |
 
 ## 6. SLI e SLA da aplicação
 
@@ -189,21 +189,21 @@ O SLA foi definido para a aplicação como um todo, usando os indicadores globai
 
 | SLI da aplicação | Valor observado |
 |---|---|
-| Total de requisições | 7.335 |
-| Throughput médio global | 244,50 req/s |
+| Total de requisições | 15.904 |
+| Throughput médio global | 265,07 req/s |
 | Disponibilidade técnica global | 100,00% |
 | Sucesso de negócio global | 100,00% |
-| Latência P50 global | 31,25 ms |
-| Latência P95 global | 61,97 ms |
-| Latência P99 global | 83,16 ms |
+| Latência P50 global | 29,21 ms |
+| Latência P95 global | 94,68 ms |
+| Latência P99 global | 109,44 ms |
 
 ### 6.2 SLA da aplicação
 
 | SLA da aplicação | Meta | SLI | Status |
 |---|---|---|---|
 | Disponibilidade técnica global | >= 99,00% | 100,00% | OK |
-| Latência P95 global | <= 800,00 ms | 61,97 ms | OK |
-| Latência P99 global | <= 1500,00 ms | 83,16 ms | OK |
+| Latência P95 global | <= 800,00 ms | 94,68 ms | OK |
+| Latência P99 global | <= 1500,00 ms | 109,44 ms | OK |
 
 ## 7. Interpretação dos resultados
 

@@ -122,25 +122,25 @@ Esse fluxo permite demonstrar:
 
 ### Resultado consolidado
 
-Execução validada:
+Execução validada com os parâmetros padrão do script (60s, 12 workers):
 
 ```bash
-DURATION_SECONDS=30 WORKERS=8 make perf
+make perf
 ```
 
 Resumo global:
 
 - disponibilidade global: **100,00%**
-- P95 global: **61,97 ms**
-- P99 global: **83,16 ms**
-- throughput global: **244,50 req/s**
+- P95 global: **94,68 ms**
+- P99 global: **109,44 ms**
+- throughput global: **265,07 req/s**
 
 Resultado do fluxo principal:
 
 - disponibilidade: **100,00%**
 - sucesso de negócio: **100,00%**
-- P95: **70,21 ms**
-- P99: **89,15 ms**
+- P95: **101,17 ms**
+- P99: **116,28 ms**
 
 Detalhamento completo em [doc/performance.md](doc/performance.md).
 
@@ -169,19 +169,14 @@ Isso atende ao critério da disciplina para **logging estruturado com Correlatio
 
 ## 8. Health check
 
-Todos os serviços expõem `/health`.
-
-Exemplos:
+Todos os serviços expõem `/health`. Os serviços de negócio são acessados exclusivamente pelo gateway; os health checks externos ficam disponíveis nos pontos de entrada públicos:
 
 ```bash
 curl http://localhost:8080/health
-curl http://localhost:8081/health
-curl http://localhost:8082/health
-curl http://localhost:8083/health
 curl http://localhost:8761/health
 ```
 
-O `docker-compose.yml` usa esses endpoints para health check operacional dos containers.
+O `docker-compose.yml` usa esses endpoints internamente para health check operacional dos containers.
 
 ## 9. Segurança
 
@@ -207,16 +202,15 @@ docker compose ps
 
 Serviços principais:
 
-| Serviço | Porta | URL |
-|---|---|---|
-| API Gateway | 8080 | http://localhost:8080 |
-| Eureka Server | 8761 | http://localhost:8761 |
-| compras-service | 8081 | interno e debug local |
-| contratos-service | 8082 | interno e debug local |
-| vendas-service | 8083 | interno e debug local |
-| Grafana | 3000 | http://localhost:3000 |
-| Prometheus | 9090 | http://localhost:9090 |
-| Jaeger | 16686 | http://localhost:16686 |
+| Serviço | URL |
+|---|---|
+| API Gateway | http://localhost:8080 |
+| Eureka Server | http://localhost:8761 |
+| Grafana | http://localhost:3000 |
+| Prometheus | http://localhost:9090 |
+| Jaeger | http://localhost:16686 |
+
+Os serviços de negócio (`compras-service`, `contratos-service`, `vendas-service`) não expõem porta no host — são acessados exclusivamente pelo gateway em `:8080`.
 
 ## 11. Demonstração ao vivo
 
@@ -319,12 +313,11 @@ Resultado esperado: `422 Unprocessable Entity`.
 
 ## 12. Swagger e documentação da API
 
-| Serviço | URL |
-|---|---|
-| Swagger global | http://localhost:8080/swagger-ui.html |
-| Swagger compras | http://localhost:8081/swagger-ui.html |
-| Swagger contratos | http://localhost:8082/swagger-ui.html |
-| Swagger vendas | http://localhost:8083/swagger-ui.html |
+A documentação de todos os serviços está agregada no gateway:
+
+| URL |
+|---|
+| http://localhost:8080/swagger-ui.html |
 
 ## 13. Testes
 
@@ -337,7 +330,7 @@ make test
 ### Performance
 
 ```bash
-DURATION_SECONDS=30 WORKERS=8 make perf
+make perf
 ```
 
 Arquivos gerados:
